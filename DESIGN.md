@@ -189,7 +189,7 @@ exists anywhere ⇒ hard deletion via the API is impossible (security by omissio
 
 | Table | SELECT | INSERT | UPDATE | DELETE |
 |---|---|---|---|---|
-| **profiles** | any logged-in user | trigger only | own row (pinned: not `role_id`/`deleted_at`) · or `user.promote` (target currently employee; new role ∈ {employee, hr}) · or `user.archive` (target employee; `deleted_at` only) · or `user.manage_all` (any target except self; role writes ∈ {employee, hr}) | — |
+| **profiles** | own row always, plus all rows if `is_active()` (archived users see only themselves) | trigger only | own row (pinned: not `role_id`/`deleted_at`) · or `user.promote` (target currently employee; new role ∈ {employee, hr}) · or `user.archive` (target employee; `deleted_at` only) · or `user.manage_all` (any target except self; role writes ∈ {employee, hr}) | — |
 | **tasks** | (owner AND `is_active()`) or `task.view_all` | `task.create` AND `assigned_by = auth.uid()` AND target is active employee | owner: whitelist §4 only · `task.update` (fields) · `task.archive` (`deleted_at`) | — |
 | **submissions** | owner or `submission.review` | `submission.create` AND task is mine AND task status ∈ {in_progress, needs_revision, overdue} AND task not archived | `submission.review`, feedback columns only (pinned) | — |
 | **ratings** | own or `rating.view_all` | `rating.create` AND `rated_by = auth.uid()` | **none — append-only** | — |
@@ -200,9 +200,10 @@ Notes:
   must retain queryable history (the point of retention).
 - Multiple UPDATE policies on `profiles` OR-combine; the pinning trigger is
   the safety net across all of them.
-- Known accepted trade-off: any logged-in user can enumerate the staff
-  directory via `profiles` SELECT. Fine at this scale; production would
-  scope it.
+- Any **active** logged-in user can enumerate the staff directory via
+  `profiles` SELECT (needed for assignee dropdowns). Archived users can read
+  only their own row. Fine at this scale; production would scope reads to
+  one's own department.
 
 ---
 

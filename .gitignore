@@ -37,3 +37,6 @@ next-env.d.ts
 
 # local AI assistant notes (never commit)
 CLAUDE.md
+
+# personal Claude Code settings (keep launch.json, ignore local settings)
+.claude/settings.local.json

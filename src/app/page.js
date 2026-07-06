@@ -1,8 +1,10 @@
 import Link from "next/link";
+import AuthHashHandler from "./AuthHashHandler";
 
 export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-8 p-8 text-center">
+      <AuthHashHandler />
       <div className="max-w-xl">
         <p className="text-sm font-semibold uppercase tracking-widest text-blue-600">
           Meritly
