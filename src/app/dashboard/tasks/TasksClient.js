@@ -1,0 +1,368 @@
+"use client";
+
+import { useState, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { Plus, Pencil, X, Paperclip } from "lucide-react";
+import { createSupabaseBrowserClient } from "@/lib/supabaseClient";
+import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Badge, StatusBadge } from "@/components/ui/Badge";
+import { Input } from "@/components/ui/Input";
+import { Label } from "@/components/ui/Label";
+import { Avatar } from "@/components/ui/Avatar";
+
+const PRIORITY_TONE = { high: "danger", medium: "warning", low: "neutral" };
+const FIELD =
+  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20";
+
+// datetime-local input <-> stored timestamp helpers.
+function toInputValue(ts) {
+  const d = new Date(ts);
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+function formatDeadline(ts) {
+  return new Date(ts).toLocaleString("en-US", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+const EMPTY = {
+  title: "",
+  description: "",
+  assigned_to: "",
+  priority: "medium",
+  deadline: "",
+};
+
+export default function TasksClient({ tasks, employees, currentUserId }) {
+  const router = useRouter();
+  const supabase = createSupabaseBrowserClient();
+
+  const [form, setForm] = useState(EMPTY);
+  const [editingId, setEditingId] = useState(null);
+  const [editAttachment, setEditAttachment] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState(null);
+  const fileRef = useRef(null);
+
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  function startEdit(t) {
+    setEditingId(t.id);
+    setEditAttachment(t.attachment_name);
+    setForm({
+      title: t.title,
+      description: t.description ?? "",
+      assigned_to: t.assigned_to,
+      priority: t.priority,
+      deadline: toInputValue(t.deadline),
+    });
+    if (fileRef.current) fileRef.current.value = "";
+    setNotice(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditAttachment(null);
+    setForm(EMPTY);
+    if (fileRef.current) fileRef.current.value = "";
+    setNotice(null);
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setBusy(true);
+    setNotice(null);
+
+    const base = {
+      title: form.title.trim(),
+      description: form.description.trim() || null,
+      assigned_to: form.assigned_to,
+      priority: form.priority,
+      deadline: new Date(form.deadline).toISOString(),
+    };
+
+    // If a file was chosen, upload it to Storage first, then save its public URL.
+    const file = fileRef.current?.files?.[0];
+    if (file) {
+      const path = `${currentUserId}/${Date.now()}-${file.name}`;
+      const { error: upErr } = await supabase.storage
+        .from("task-attachments")
+        .upload(path, file);
+      if (upErr) {
+        setNotice({ type: "error", text: upErr.message });
+        setBusy(false);
+        return;
+      }
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("task-attachments").getPublicUrl(path);
+      base.attachment_url = publicUrl;
+      base.attachment_name = file.name;
+    }
+
+    let error;
+    if (editingId) {
+      ({ error } = await supabase
+        .from("tasks")
+        .update(base)
+        .eq("id", editingId));
+    } else {
+      // assigned_by must be the current user; RLS also verifies this.
+      ({ error } = await supabase.from("tasks").insert({
+        ...base,
+        assigned_by: currentUserId,
+        status: "pending",
+      }));
+    }
+
+    if (error) {
+      setNotice({ type: "error", text: error.message });
+      setBusy(false);
+      return;
+    }
+    setForm(EMPTY);
+    setEditingId(null);
+    setEditAttachment(null);
+    if (fileRef.current) fileRef.current.value = "";
+    setBusy(false);
+    router.refresh();
+  }
+
+  async function archive(id) {
+    setBusy(true);
+    setNotice(null);
+    const { error } = await supabase
+      .from("tasks")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", id);
+    if (error) setNotice({ type: "error", text: error.message });
+    else router.refresh();
+    setBusy(false);
+  }
+
+  return (
+    <div>
+      <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+        Tasks
+      </h1>
+      <p className="mt-1 text-sm text-slate-500">
+        Assign work to employees and track it here.
+      </p>
+
+      {/* Create / edit form */}
+      <Card className="mt-6 p-5">
+        <h2 className="mb-4 text-sm font-semibold text-slate-900">
+          {editingId ? "Edit task" : "New task"}
+        </h2>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label>Title</Label>
+            <Input
+              required
+              value={form.title}
+              onChange={(e) => set("title", e.target.value)}
+              placeholder="Prepare Q3 report"
+            />
+          </div>
+          <div>
+            <Label>Description</Label>
+            <textarea
+              rows={2}
+              value={form.description}
+              onChange={(e) => set("description", e.target.value)}
+              placeholder="What needs to be done"
+              className={FIELD}
+            />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div>
+              <Label>Assignee</Label>
+              <select
+                required
+                value={form.assigned_to}
+                onChange={(e) => set("assigned_to", e.target.value)}
+                className={FIELD}
+              >
+                <option value="" disabled>
+                  Select an employee
+                </option>
+                {employees.map((emp) => (
+                  <option key={emp.id} value={emp.id}>
+                    {emp.full_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label>Priority</Label>
+              <select
+                value={form.priority}
+                onChange={(e) => set("priority", e.target.value)}
+                className={FIELD}
+              >
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+            </div>
+            <div>
+              <Label>Deadline</Label>
+              <Input
+                type="datetime-local"
+                required
+                value={form.deadline}
+                onChange={(e) => set("deadline", e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div>
+            <Label>Attachment (optional)</Label>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.webp,.txt,.zip"
+              className="block w-full text-sm text-slate-600 file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-brand-700 hover:file:bg-brand-100"
+            />
+            {editingId && editAttachment && (
+              <p className="mt-1 text-xs text-slate-500">
+                Current: {editAttachment} — choose a file to replace it.
+              </p>
+            )}
+          </div>
+
+          {notice && (
+            <p
+              className={`text-sm ${
+                notice.type === "error" ? "text-rose-600" : "text-emerald-600"
+              }`}
+            >
+              {notice.text}
+            </p>
+          )}
+
+          <div className="flex gap-2">
+            <Button type="submit" disabled={busy}>
+              {!editingId && <Plus className="h-4 w-4" />}
+              {busy
+                ? "Saving…"
+                : editingId
+                ? "Save changes"
+                : "Assign task"}
+            </Button>
+            {editingId && (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={cancelEdit}
+                disabled={busy}
+              >
+                <X className="h-4 w-4" />
+                Cancel
+              </Button>
+            )}
+          </div>
+        </form>
+      </Card>
+
+      {/* Task list */}
+      <Card className="mt-4 overflow-hidden">
+        {tasks.length === 0 ? (
+          <p className="px-5 py-10 text-center text-sm text-slate-500">
+            No tasks yet. Assign your first task above.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-left text-sm">
+              <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-5 py-3 font-medium">Task</th>
+                  <th className="px-4 py-3 font-medium">Assignee</th>
+                  <th className="px-4 py-3 font-medium">Priority</th>
+                  <th className="px-4 py-3 font-medium">Deadline</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-5 py-3 text-right font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {tasks.map((t) => (
+                  <tr key={t.id} className="hover:bg-slate-50/60">
+                    <td className="px-5 py-3">
+                      <p className="font-medium text-slate-900">{t.title}</p>
+                      {t.description && (
+                        <p className="max-w-xs truncate text-xs text-slate-500">
+                          {t.description}
+                        </p>
+                      )}
+                      {t.attachment_url && (
+                        <a
+                          href={t.attachment_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:underline"
+                        >
+                          <Paperclip className="h-3 w-3" />
+                          {t.attachment_name || "Attachment"}
+                        </a>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <Avatar
+                          name={t.assignee_name}
+                          className="h-7 w-7 text-[11px]"
+                        />
+                        <span className="text-slate-700">
+                          {t.assignee_name}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge tone={PRIORITY_TONE[t.priority]}>
+                        <span className="capitalize">{t.priority}</span>
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {formatDeadline(t.deadline)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <StatusBadge status={t.status} />
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => startEdit(t)}
+                          disabled={busy}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          Edit
+                        </Button>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={() => archive(t.id)}
+                          disabled={busy}
+                        >
+                          Archive
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
