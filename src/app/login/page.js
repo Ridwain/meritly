@@ -3,6 +3,10 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseClient";
+import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Label } from "@/components/ui/Label";
 
 // Sign-in only. Accounts are created by invitation (HR/admin), never by public
 // signup — so there is no "create account" option here.
@@ -16,7 +20,6 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [deactivated, setDeactivated] = useState(false);
 
-  // Show a message if the dashboard bounced an archived user here.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("deactivated") === "1") setDeactivated(true);
@@ -40,61 +43,53 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
-      <div className="w-full max-w-sm rounded-xl bg-white p-8 shadow-sm">
-        <p className="text-center text-sm font-semibold uppercase tracking-widest text-blue-600">
+    <main className="flex min-h-screen items-center justify-center p-4">
+      <Card className="w-full max-w-sm p-8 shadow-sm">
+        <p className="text-center text-sm font-semibold uppercase tracking-[0.2em] text-brand-600">
           Meritly
         </p>
-        <h1 className="mt-1 text-center text-2xl font-bold">Sign in</h1>
+        <h1 className="mt-1 text-center text-2xl font-semibold tracking-tight text-slate-900">
+          Sign in
+        </h1>
 
         {deactivated && (
-          <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+          <p className="mt-4 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-600">
             Your account has been deactivated. Please contact your HR or admin.
           </p>
         )}
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Email
-            </label>
-            <input
+            <Label>Email</Label>
+            <Input
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none"
             />
           </div>
-
           <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Password
-            </label>
-            <input
+            <Label>Password</Label>
+            <Input
               type="password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none"
             />
           </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-rose-600">{error}</p>}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
-          >
+          <Button type="submit" disabled={loading} className="w-full">
             {loading ? "Please wait…" : "Sign in"}
-          </button>
+          </Button>
         </form>
 
-        <p className="mt-4 text-center text-xs text-gray-500">
-          Accounts are created by invitation. Contact your HR or admin to get access.
+        <p className="mt-4 text-center text-xs text-slate-500">
+          Accounts are created by invitation. Contact your HR or admin to get
+          access.
         </p>
-      </div>
+      </Card>
     </main>
   );
 }

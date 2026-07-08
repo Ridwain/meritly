@@ -1,5 +1,6 @@
-// The dashboard "Overview" landing page (Server Component).
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { Card } from "@/components/ui/Card";
+import { CheckCircle2 } from "lucide-react";
 
 export default async function DashboardOverview() {
   const supabase = createSupabaseServerClient();
@@ -14,36 +15,51 @@ export default async function DashboardOverview() {
     .single();
 
   const role = profile?.roles?.name;
-  const roleLabel = { employee: "Employee", hr: "HR", admin: "Admin" }[role] ?? role;
+  const roleLabel =
+    { employee: "Employee", hr: "HR", admin: "Admin" }[role] ?? role;
+  const firstName = profile?.full_name?.split(" ")[0] ?? "there";
+
+  const items =
+    role === "employee"
+      ? [
+          "See tasks assigned to you under My Tasks.",
+          "Start a task and submit your completed work.",
+        ]
+      : [
+          "Assign and review tasks.",
+          "Track each employee's performance.",
+          role === "admin" ? "Manage users and roles." : "Manage users.",
+        ];
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900">
-        Welcome, {profile?.full_name} 👋
+      <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+        Welcome back, {firstName}
       </h1>
-      <p className="mt-2 text-gray-600">
-        You are signed in as{" "}
-        <span className="font-semibold">{roleLabel}</span>.
+      <p className="mt-1 text-sm text-slate-500">
+        You&rsquo;re signed in as{" "}
+        <span className="font-medium text-slate-700">{roleLabel}</span>.
       </p>
 
-      <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6">
-        <h2 className="font-semibold text-gray-900">What you can do here</h2>
-        {role === "employee" ? (
-          <ul className="mt-2 list-inside list-disc text-sm text-gray-600">
-            <li>See tasks assigned to you under “My Tasks”.</li>
-            <li>Start a task and submit your completed work.</li>
-          </ul>
-        ) : (
-          <ul className="mt-2 list-inside list-disc text-sm text-gray-600">
-            <li>Assign and review tasks.</li>
-            <li>Track each employee’s performance.</li>
-            <li>Manage users{role === "admin" ? " and roles" : ""}.</li>
-          </ul>
-        )}
-        <p className="mt-4 text-xs text-gray-400">
+      <Card className="mt-6 p-6">
+        <h2 className="text-sm font-semibold text-slate-900">
+          What you can do here
+        </h2>
+        <ul className="mt-3 space-y-2">
+          {items.map((t) => (
+            <li
+              key={t}
+              className="flex items-start gap-2 text-sm text-slate-600"
+            >
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-brand-500" />
+              {t}
+            </li>
+          ))}
+        </ul>
+        <p className="mt-4 text-xs text-slate-400">
           These sections get built in the next features.
         </p>
-      </div>
+      </Card>
     </div>
   );
 }
