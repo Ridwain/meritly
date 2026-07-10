@@ -18,6 +18,9 @@ export default async function TasksPage() {
   });
   if (!canView) redirect("/dashboard");
 
+  // Flag any past-deadline tasks as overdue before we read them (Feature 8).
+  await supabase.rpc("flag_overdue_tasks");
+
   // All active (non-archived) tasks, newest first.
   const { data: tasks } = await supabase
     .from("tasks")
