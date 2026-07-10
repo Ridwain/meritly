@@ -12,7 +12,6 @@ export default async function MyTasksPage() {
   if (!user) redirect("/login");
 
   // Only the current user's own, non-archived tasks — soonest deadline first.
-  // RLS (tasks_select) also guarantees an employee can't read anyone else's.
   const { data: tasks } = await supabase
     .from("tasks")
     .select(
@@ -22,7 +21,6 @@ export default async function MyTasksPage() {
     .is("deleted_at", null)
     .order("deadline", { ascending: true });
 
-  // Look up who assigned each task (for an "Assigned by …" line).
   const { data: profiles } = await supabase
     .from("profiles")
     .select("id, full_name");
@@ -30,10 +28,22 @@ export default async function MyTasksPage() {
     (profiles ?? []).map((p) => [p.id, p.full_name])
   );
 
+  // Latest submission per task — used to show HR's feedback on returned work.
+  const { data: subs } = await supabase
+    .from("submissions")
+    .select("task_id, hr_feedback, submitted_at")
+    .eq("employee_id", user.id)
+    .order("submitted_at", { ascending: false });
+  const latestByTask = {};
+  for (const s of subs ?? []) {
+    if (!latestByTask[s.task_id]) latestByTask[s.task_id] = s; // first seen = latest
+  }
+
   const tasksWithNames = (tasks ?? []).map((t) => ({
     ...t,
     assigner_name: nameById[t.assigned_by] ?? "HR",
+    latest_feedback: latestByTask[t.id]?.hr_feedback ?? null,
   }));
 
-  return <MyTasksClient tasks={tasksWithNames} />;
+  return <MyTasksClient tasks={tasksWithNames} userId={user.id} />;
 }

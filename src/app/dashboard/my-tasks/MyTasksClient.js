@@ -1,14 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Paperclip, Play, Clock } from "lucide-react";
+import { Paperclip, Play, Clock, Send, X } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabaseClient";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge, StatusBadge } from "@/components/ui/Badge";
+import { Label } from "@/components/ui/Label";
 
 const PRIORITY_TONE = { high: "danger", medium: "warning", low: "neutral" };
+// Statuses from which an employee may submit work.
+const CAN_SUBMIT = ["in_progress", "needs_revision", "overdue"];
+const FIELD =
+  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20";
 
 function formatDeadline(ts) {
   return new Date(ts).toLocaleString("en-US", {
@@ -20,14 +25,17 @@ function formatDeadline(ts) {
   });
 }
 
-export default function MyTasksClient({ tasks }) {
+export default function MyTasksClient({ tasks, userId }) {
   const router = useRouter();
   const supabase = createSupabaseBrowserClient();
-  const [busyId, setBusyId] = useState(null);
+  const fileRef = useRef(null);
+
+  const [busyId, setBusyId] = useState(null); // task being "started"
+  const [submittingId, setSubmittingId] = useState(null); // task whose submit form is open
+  const [note, setNote] = useState("");
+  const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState(null);
 
-  // Move a pending task to in_progress. The status-whitelist trigger only
-  // allows pending -> in_progress here, so nothing else can slip through.
   async function start(id) {
     setBusyId(id);
     setNotice(null);
@@ -38,6 +46,71 @@ export default function MyTasksClient({ tasks }) {
     if (error) setNotice({ type: "error", text: error.message });
     else router.refresh();
     setBusyId(null);
+  }
+
+  function openSubmit(id) {
+    setSubmittingId(id);
+    setNote("");
+    setNotice(null);
+    if (fileRef.current) fileRef.current.value = "";
+  }
+  function cancelSubmit() {
+    setSubmittingId(null);
+    setNote("");
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
+  async function submitWork(task) {
+    setSaving(true);
+    setNotice(null);
+
+    // 1) Optional file upload (into the employee's own folder).
+    let file_url = null;
+    const file = fileRef.current?.files?.[0];
+    if (file) {
+      const path = `${userId}/${task.id}-${Date.now()}-${file.name}`;
+      const { error: upErr } = await supabase.storage
+        .from("submissions")
+        .upload(path, file);
+      if (upErr) {
+        setNotice({ type: "error", text: upErr.message });
+        setSaving(false);
+        return;
+      }
+      file_url = supabase.storage.from("submissions").getPublicUrl(path)
+        .data.publicUrl;
+    }
+
+    // 2) Insert the submission FIRST — RLS only allows this while the task is
+    //    still in a submittable state (in_progress / needs_revision / overdue).
+    const { error: subErr } = await supabase.from("submissions").insert({
+      task_id: task.id,
+      employee_id: userId,
+      note: note.trim(),
+      file_url,
+    });
+    if (subErr) {
+      setNotice({ type: "error", text: subErr.message });
+      setSaving(false);
+      return;
+    }
+
+    // 3) Then flip the task to 'submitted'.
+    const { error: taskErr } = await supabase
+      .from("tasks")
+      .update({ status: "submitted" })
+      .eq("id", task.id);
+    if (taskErr) {
+      setNotice({ type: "error", text: taskErr.message });
+      setSaving(false);
+      return;
+    }
+
+    setSubmittingId(null);
+    setNote("");
+    if (fileRef.current) fileRef.current.value = "";
+    setSaving(false);
+    router.refresh();
   }
 
   return (
@@ -93,15 +166,72 @@ export default function MyTasksClient({ tasks }) {
                       </a>
                     )}
                   </div>
+
+                  {/* HR feedback when the task was returned for revision */}
+                  {t.status === "needs_revision" && t.latest_feedback && (
+                    <div className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                      <span className="font-medium">HR feedback:</span>{" "}
+                      {t.latest_feedback}
+                    </div>
+                  )}
                 </div>
 
-                {t.status === "pending" && (
-                  <Button onClick={() => start(t.id)} disabled={busyId === t.id}>
-                    <Play className="h-4 w-4" />
-                    {busyId === t.id ? "Starting…" : "Start"}
-                  </Button>
-                )}
+                {/* Action button */}
+                <div className="shrink-0">
+                  {t.status === "pending" && (
+                    <Button onClick={() => start(t.id)} disabled={busyId === t.id}>
+                      <Play className="h-4 w-4" />
+                      {busyId === t.id ? "Starting…" : "Start"}
+                    </Button>
+                  )}
+                  {CAN_SUBMIT.includes(t.status) && submittingId !== t.id && (
+                    <Button onClick={() => openSubmit(t.id)}>
+                      <Send className="h-4 w-4" />
+                      Submit work
+                    </Button>
+                  )}
+                </div>
               </div>
+
+              {/* Inline submit form */}
+              {submittingId === t.id && (
+                <div className="mt-4 border-t border-slate-200 pt-4">
+                  <Label>Work note</Label>
+                  <textarea
+                    rows={3}
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder="Describe what you did"
+                    className={FIELD}
+                  />
+                  <div className="mt-3">
+                    <Label>Attach a file (optional)</Label>
+                    <input
+                      ref={fileRef}
+                      type="file"
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.webp,.txt,.zip"
+                      className="block w-full text-sm text-slate-600 file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-brand-700 hover:file:bg-brand-100"
+                    />
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <Button
+                      onClick={() => submitWork(t)}
+                      disabled={saving || !note.trim()}
+                    >
+                      <Send className="h-4 w-4" />
+                      {saving ? "Submitting…" : "Submit work"}
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={cancelSubmit}
+                      disabled={saving}
+                    >
+                      <X className="h-4 w-4" />
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
             </Card>
           ))}
         </div>
