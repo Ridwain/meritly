@@ -1,8 +1,16 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, Fragment } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, X, Paperclip } from "lucide-react";
+import {
+  Plus,
+  Pencil,
+  X,
+  Paperclip,
+  ClipboardCheck,
+  Check,
+  RotateCcw,
+} from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabaseClient";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -49,6 +57,11 @@ export default function TasksClient({ tasks, employees, currentUserId }) {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(null);
   const fileRef = useRef(null);
+
+  // Review state
+  const [reviewingId, setReviewingId] = useState(null);
+  const [feedback, setFeedback] = useState("");
+  const [reviewBusy, setReviewBusy] = useState(false);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -147,6 +160,55 @@ export default function TasksClient({ tasks, employees, currentUserId }) {
     setBusy(false);
   }
 
+  function openReview(t) {
+    setReviewingId(t.id);
+    setFeedback(t.latest_submission?.hr_feedback ?? "");
+    setNotice(null);
+  }
+  function cancelReview() {
+    setReviewingId(null);
+    setFeedback("");
+  }
+
+  // decision = 'completed' (approve) or 'needs_revision' (return)
+  async function review(task, decision) {
+    setReviewBusy(true);
+    setNotice(null);
+
+    // 1) Save HR feedback on the submission (only feedback fields may change).
+    const sub = task.latest_submission;
+    if (sub) {
+      const { error: fbErr } = await supabase
+        .from("submissions")
+        .update({
+          hr_feedback: feedback.trim() || null,
+          reviewed_at: new Date().toISOString(),
+        })
+        .eq("id", sub.id);
+      if (fbErr) {
+        setNotice({ type: "error", text: fbErr.message });
+        setReviewBusy(false);
+        return;
+      }
+    }
+
+    // 2) Set the task status (submitted -> completed / needs_revision).
+    const { error: tErr } = await supabase
+      .from("tasks")
+      .update({ status: decision })
+      .eq("id", task.id);
+    if (tErr) {
+      setNotice({ type: "error", text: tErr.message });
+      setReviewBusy(false);
+      return;
+    }
+
+    setReviewingId(null);
+    setFeedback("");
+    setReviewBusy(false);
+    router.refresh();
+  }
+
   return (
     <div>
       <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
@@ -238,7 +300,7 @@ export default function TasksClient({ tasks, employees, currentUserId }) {
             )}
           </div>
 
-          {notice && (
+          {notice && !reviewingId && (
             <p
               className={`text-sm ${
                 notice.type === "error" ? "text-rose-600" : "text-emerald-600"
@@ -251,11 +313,7 @@ export default function TasksClient({ tasks, employees, currentUserId }) {
           <div className="flex gap-2">
             <Button type="submit" disabled={busy}>
               {!editingId && <Plus className="h-4 w-4" />}
-              {busy
-                ? "Saving…"
-                : editingId
-                ? "Save changes"
-                : "Assign task"}
+              {busy ? "Saving…" : editingId ? "Save changes" : "Assign task"}
             </Button>
             {editingId && (
               <Button
@@ -293,70 +351,156 @@ export default function TasksClient({ tasks, employees, currentUserId }) {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {tasks.map((t) => (
-                  <tr key={t.id} className="hover:bg-slate-50/60">
-                    <td className="px-5 py-3">
-                      <p className="font-medium text-slate-900">{t.title}</p>
-                      {t.description && (
-                        <p className="max-w-xs truncate text-xs text-slate-500">
-                          {t.description}
-                        </p>
-                      )}
-                      {t.attachment_url && (
-                        <a
-                          href={t.attachment_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:underline"
-                        >
-                          <Paperclip className="h-3 w-3" />
-                          {t.attachment_name || "Attachment"}
-                        </a>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <Avatar
-                          name={t.assignee_name}
-                          className="h-7 w-7 text-[11px]"
-                        />
-                        <span className="text-slate-700">
-                          {t.assignee_name}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge tone={PRIORITY_TONE[t.priority]}>
-                        <span className="capitalize">{t.priority}</span>
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">
-                      {formatDeadline(t.deadline)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={t.status} />
-                    </td>
-                    <td className="px-5 py-3">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => startEdit(t)}
-                          disabled={busy}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                          Edit
-                        </Button>
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          onClick={() => archive(t.id)}
-                          disabled={busy}
-                        >
-                          Archive
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
+                  <Fragment key={t.id}>
+                    <tr className="hover:bg-slate-50/60">
+                      <td className="px-5 py-3">
+                        <p className="font-medium text-slate-900">{t.title}</p>
+                        {t.description && (
+                          <p className="max-w-xs truncate text-xs text-slate-500">
+                            {t.description}
+                          </p>
+                        )}
+                        {t.attachment_url && (
+                          <a
+                            href={t.attachment_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:underline"
+                          >
+                            <Paperclip className="h-3 w-3" />
+                            {t.attachment_name || "Attachment"}
+                          </a>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <Avatar
+                            name={t.assignee_name}
+                            className="h-7 w-7 text-[11px]"
+                          />
+                          <span className="text-slate-700">
+                            {t.assignee_name}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge tone={PRIORITY_TONE[t.priority]}>
+                          <span className="capitalize">{t.priority}</span>
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">
+                        {formatDeadline(t.deadline)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <StatusBadge status={t.status} />
+                      </td>
+                      <td className="px-5 py-3">
+                        <div className="flex justify-end gap-2">
+                          {t.status === "submitted" && (
+                            <Button
+                              size="sm"
+                              onClick={() => openReview(t)}
+                              disabled={reviewBusy}
+                            >
+                              <ClipboardCheck className="h-3.5 w-3.5" />
+                              Review
+                            </Button>
+                          )}
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => startEdit(t)}
+                            disabled={busy}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Edit
+                          </Button>
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={() => archive(t.id)}
+                            disabled={busy}
+                          >
+                            Archive
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+
+                    {/* Review panel */}
+                    {reviewingId === t.id && (
+                      <tr className="bg-slate-50">
+                        <td colSpan={6} className="px-5 py-4">
+                          <div className="rounded-lg border border-slate-200 bg-white p-4">
+                            <h3 className="text-sm font-semibold text-slate-900">
+                              Review submission
+                            </h3>
+                            {t.latest_submission ? (
+                              <>
+                                <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">
+                                  {t.latest_submission.note}
+                                </p>
+                                {t.latest_submission.file_url && (
+                                  <a
+                                    href={t.latest_submission.file_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:underline"
+                                  >
+                                    <Paperclip className="h-3.5 w-3.5" />
+                                    Submitted file
+                                  </a>
+                                )}
+                                <div className="mt-3">
+                                  <Label>Feedback (optional)</Label>
+                                  <textarea
+                                    rows={2}
+                                    value={feedback}
+                                    onChange={(e) => setFeedback(e.target.value)}
+                                    placeholder="Feedback for the employee"
+                                    className={FIELD}
+                                  />
+                                </div>
+                                {notice && (
+                                  <p className="mt-2 text-sm text-rose-600">
+                                    {notice.text}
+                                  </p>
+                                )}
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                  <Button
+                                    onClick={() => review(t, "completed")}
+                                    disabled={reviewBusy}
+                                  >
+                                    <Check className="h-4 w-4" />
+                                    Approve &amp; complete
+                                  </Button>
+                                  <Button
+                                    variant="secondary"
+                                    onClick={() => review(t, "needs_revision")}
+                                    disabled={reviewBusy}
+                                  >
+                                    <RotateCcw className="h-4 w-4" />
+                                    Return for revision
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    onClick={cancelReview}
+                                    disabled={reviewBusy}
+                                  >
+                                    Cancel
+                                  </Button>
+                                </div>
+                              </>
+                            ) : (
+                              <p className="mt-2 text-sm text-slate-500">
+                                No submission found for this task.
+                              </p>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>

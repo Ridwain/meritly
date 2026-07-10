@@ -40,9 +40,21 @@ export default async function TasksPage() {
     .filter((p) => p.roles?.name === "employee" && !p.deleted_at)
     .map((p) => ({ id: p.id, full_name: p.full_name }));
 
+  // Latest submission per task — the review panel shows the newest one.
+  // RLS lets HR (submission.review) read every submission.
+  const { data: subs } = await supabase
+    .from("submissions")
+    .select("id, task_id, note, file_url, hr_feedback, submitted_at")
+    .order("submitted_at", { ascending: false });
+  const latestByTask = {};
+  for (const s of subs ?? []) {
+    if (!latestByTask[s.task_id]) latestByTask[s.task_id] = s;
+  }
+
   const tasksWithNames = (tasks ?? []).map((t) => ({
     ...t,
     assignee_name: nameById[t.assigned_to] ?? "Unknown",
+    latest_submission: latestByTask[t.id] ?? null,
   }));
 
   return (
