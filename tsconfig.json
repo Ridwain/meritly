@@ -1,0 +1,50 @@
+{
+  "compilerOptions": {
+    // --- What JavaScript/DOM features TypeScript knows about ---
+    "target": "ES2022",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "ES2022"
+    ],
+    // --- Let .js and .ts live side by side during the migration ---
+    "allowJs": true,
+    "checkJs": false,
+    // --- Strictness: start OFF so existing code compiles, tighten in Phase 6 ---
+    "strict": false,
+    // --- Module setup that Next.js expects ---
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    // --- Next builds the output; TypeScript only type-checks ---
+    "noEmit": true,
+    "incremental": true,
+    // --- The @/* alias, carried over from jsconfig.json ---
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ]
+    },
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ]
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}
