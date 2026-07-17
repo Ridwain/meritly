@@ -30,18 +30,18 @@ export default async function TasksPage() {
     .is("deleted_at", null)
     .order("created_at", { ascending: false });
 
-  // Fetch every profile once: used both to show assignee names and to build
-  // the dropdown of assignable (active) employees.
+  // Names for display (assignee column can include archived/old people).
   const { data: profiles } = await supabase
     .from("profiles")
-    .select("id, full_name, deleted_at, roles(name)");
-
+    .select("id, full_name");
   const nameById = Object.fromEntries(
     (profiles ?? []).map((p) => [p.id, p.full_name])
   );
-  const employees = (profiles ?? [])
-    .filter((p) => p.roles?.name === "employee" && !p.deleted_at)
-    .map((p) => ({ id: p.id, full_name: p.full_name }));
+
+  // Dropdown: only employees who are active AND accepted their invite
+  // (set a password). The DB function enforces the same rule as the
+  // tasks_insert policy, so the UI and the security rule can't drift.
+  const { data: employees } = await supabase.rpc("assignable_employees");
 
   // Latest submission per task — the review panel shows the newest one.
   // RLS lets HR (submission.review) read every submission.
