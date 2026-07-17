@@ -22,7 +22,7 @@ NAV_BY_ROLE.admin = NAV_BY_ROLE.hr;
 const ROLE_LABELS = { employee: "Employee", hr: "HR", admin: "Admin" };
 
 export default async function DashboardLayout({ children }) {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   const {
     data: { user },

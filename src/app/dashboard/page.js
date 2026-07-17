@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/Card";
 import { CheckCircle2 } from "lucide-react";
 
 export default async function DashboardOverview() {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

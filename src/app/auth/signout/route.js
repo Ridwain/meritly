@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 
 export async function POST(request) {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   await supabase.auth.signOut();
   // 303 => the browser follows with a GET (correct after a POST).
   return NextResponse.redirect(new URL("/login", request.url), { status: 303 });

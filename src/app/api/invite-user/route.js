@@ -17,7 +17,7 @@ export async function POST(request) {
   }
 
   // 1) Who is calling? (server client = the logged-in user's session)
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
