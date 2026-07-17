@@ -4,11 +4,12 @@
 // non-public env var. Only import it from server code (API routes), and always
 // check the caller's permission FIRST before doing anything with it.
 import { createClient } from "@supabase/supabase-js";
+import type { Database } from "./database.types";
 
 export function createSupabaseAdminClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
+  return createClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
 }

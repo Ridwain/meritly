@@ -1,19 +1,20 @@
-// Middleware Supabase client.
-// Middleware runs on the Edge before a page renders. Its job here:
+// Proxy (formerly middleware) Supabase client.
+// This runs on the Edge before a page renders. Its job here:
 //   1. keep the login session fresh (refresh the auth cookie), and
 //   2. bounce logged-out visitors away from /dashboard.
 // The cookie juggling below is the official @supabase/ssr pattern: we must
 // copy refreshed auth cookies onto BOTH the request (so this pass sees them)
 // and the response (so the browser stores them).
 import { createServerClient } from "@supabase/ssr";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import type { Database } from "./database.types";
 
-export async function updateSession(request) {
+export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  const supabase = createServerClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
         getAll() {
@@ -33,7 +34,7 @@ export async function updateSession(request) {
   );
 
   // IMPORTANT: getUser() revalidates the token with Supabase (don't trust
-  // getSession() in middleware — it doesn't verify the JWT).
+  // getSession() here — it doesn't verify the JWT).
   const {
     data: { user },
   } = await supabase.auth.getUser();
