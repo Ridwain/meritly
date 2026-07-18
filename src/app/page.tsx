@@ -1,8 +1,20 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowRight } from "lucide-react";
+import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import AuthHashHandler from "./AuthHashHandler";
 
-export default function Home() {
+// Same guard as login/page.tsx, mirroring dashboard/layout.tsx: an
+// already-logged-in visitor gets sent straight to the dashboard instead of
+// seeing the marketing/landing page again.
+export default async function Home() {
+  const supabase = await createSupabaseServerClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user) redirect("/dashboard");
+
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-8 p-8 text-center">
       <AuthHashHandler />
