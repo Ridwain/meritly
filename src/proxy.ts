@@ -1,9 +1,10 @@
 // Next.js 16 renamed the "middleware" file convention to "proxy".
 // Same idea: this runs before a matching request reaches a page — here it
 // refreshes the Supabase session and bounces logged-out visitors off /dashboard.
+import type { NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabaseMiddleware";
 
-export async function proxy(request) {
+export async function proxy(request: NextRequest) {
   return await updateSession(request);
 }
 

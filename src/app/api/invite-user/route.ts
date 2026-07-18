@@ -2,12 +2,17 @@
 // Creates a new (employee) account by invitation and emails them a link to
 // set their password. This route uses the service-role key, so its FIRST job
 // is to prove the caller is allowed to invite — never trust the request alone.
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 
-export async function POST(request) {
-  const { email, fullName } = await request.json();
+type InviteBody = {
+  email?: string;
+  fullName?: string;
+};
+
+export async function POST(request: NextRequest) {
+  const { email, fullName }: InviteBody = await request.json();
 
   if (!email || !fullName) {
     return NextResponse.json(
