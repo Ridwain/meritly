@@ -10,8 +10,8 @@
     // --- Let .js and .ts live side by side during the migration ---
     "allowJs": true,
     "checkJs": false,
-    // --- Strictness: start OFF so existing code compiles, tighten in Phase 6 ---
-    "strict": false,
+    // --- Strictness: ON. Catches values that might be null/undefined. ---
+    "strict": true,
     // --- Module setup that Next.js expects ---
     "module": "esnext",
     "moduleResolution": "bundler",
