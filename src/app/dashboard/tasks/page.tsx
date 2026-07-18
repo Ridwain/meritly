@@ -1,6 +1,7 @@
 // HR/admin Tasks page (Server Component): guard + data fetch.
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import type { AssignableEmployee, HrTask, LatestSubmission } from "@/lib/types";
 import TasksClient from "./TasksClient";
 
 export default async function TasksPage() {
@@ -34,7 +35,7 @@ export default async function TasksPage() {
   const { data: profiles } = await supabase
     .from("profiles")
     .select("id, full_name");
-  const nameById = Object.fromEntries(
+  const nameById: Record<string, string> = Object.fromEntries(
     (profiles ?? []).map((p) => [p.id, p.full_name])
   );
 
@@ -49,21 +50,24 @@ export default async function TasksPage() {
     .from("submissions")
     .select("id, task_id, note, file_url, hr_feedback, submitted_at")
     .order("submitted_at", { ascending: false });
-  const latestByTask = {};
+
+  const latestByTask: Record<string, LatestSubmission> = {};
   for (const s of subs ?? []) {
     if (!latestByTask[s.task_id]) latestByTask[s.task_id] = s;
   }
 
+  // Cast to the narrowed HrTask shape here — the DB types give status/priority
+  // as plain `string` because we used CHECK constraints rather than enums.
   const tasksWithNames = (tasks ?? []).map((t) => ({
     ...t,
     assignee_name: nameById[t.assigned_to] ?? "Unknown",
     latest_submission: latestByTask[t.id] ?? null,
-  }));
+  })) as HrTask[];
 
   return (
     <TasksClient
       tasks={tasksWithNames}
-      employees={employees}
+      employees={(employees ?? []) as AssignableEmployee[]}
       currentUserId={user.id}
     />
   );

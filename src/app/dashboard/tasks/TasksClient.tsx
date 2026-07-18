@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, Fragment } from "react";
+import { useState, useRef, Fragment, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus,
@@ -14,22 +14,32 @@ import {
 import { createSupabaseBrowserClient } from "@/lib/supabaseClient";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Badge, StatusBadge } from "@/components/ui/Badge";
+import { Badge, type BadgeTone, StatusBadge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Avatar } from "@/components/ui/Avatar";
+import type {
+  AssignableEmployee,
+  HrTask,
+  Notice,
+  Priority,
+} from "@/lib/types";
 
-const PRIORITY_TONE = { high: "danger", medium: "warning", low: "neutral" };
+const PRIORITY_TONE: Record<Priority, BadgeTone> = {
+  high: "danger",
+  medium: "warning",
+  low: "neutral",
+};
 const FIELD =
   "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20";
 
 // datetime-local input <-> stored timestamp helpers.
-function toInputValue(ts) {
+function toInputValue(ts: string): string {
   const d = new Date(ts);
   const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
   return local.toISOString().slice(0, 16);
 }
-function formatDeadline(ts) {
+function formatDeadline(ts: string): string {
   return new Date(ts).toLocaleString("en-US", {
     day: "numeric",
     month: "short",
@@ -39,7 +49,27 @@ function formatDeadline(ts) {
   });
 }
 
-const EMPTY = {
+// The shape of the create/edit form.
+type TaskForm = {
+  title: string;
+  description: string;
+  assigned_to: string;
+  priority: Priority;
+  deadline: string;
+};
+
+// What we send when creating/updating a task (attachment fields are optional).
+type TaskPayload = {
+  title: string;
+  description: string | null;
+  assigned_to: string;
+  priority: Priority;
+  deadline: string;
+  attachment_url?: string;
+  attachment_name?: string;
+};
+
+const EMPTY: TaskForm = {
   title: "",
   description: "",
   assigned_to: "",
@@ -47,25 +77,38 @@ const EMPTY = {
   deadline: "",
 };
 
-export default function TasksClient({ tasks, employees, currentUserId }) {
+export type TasksClientProps = {
+  tasks: HrTask[];
+  employees: AssignableEmployee[];
+  currentUserId: string;
+};
+
+export default function TasksClient({
+  tasks,
+  employees,
+  currentUserId,
+}: TasksClientProps) {
   const router = useRouter();
   const supabase = createSupabaseBrowserClient();
 
-  const [form, setForm] = useState(EMPTY);
-  const [editingId, setEditingId] = useState(null);
-  const [editAttachment, setEditAttachment] = useState(null);
+  const [form, setForm] = useState<TaskForm>(EMPTY);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editAttachment, setEditAttachment] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState(null);
-  const fileRef = useRef(null);
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   // Review state
-  const [reviewingId, setReviewingId] = useState(null);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState("");
   const [reviewBusy, setReviewBusy] = useState(false);
 
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  // Generic setter: K is a key of TaskForm, and v must match that key's type,
+  // so set("priority", "urgent") is a compile error.
+  const set = <K extends keyof TaskForm>(k: K, v: TaskForm[K]) =>
+    setForm((f) => ({ ...f, [k]: v }));
 
-  function startEdit(t) {
+  function startEdit(t: HrTask) {
     setEditingId(t.id);
     setEditAttachment(t.attachment_name);
     setForm({
@@ -88,12 +131,12 @@ export default function TasksClient({ tasks, employees, currentUserId }) {
     setNotice(null);
   }
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
     setNotice(null);
 
-    const base = {
+    const base: TaskPayload = {
       title: form.title.trim(),
       description: form.description.trim() || null,
       assigned_to: form.assigned_to,
@@ -148,7 +191,7 @@ export default function TasksClient({ tasks, employees, currentUserId }) {
     router.refresh();
   }
 
-  async function archive(id) {
+  async function archive(id: string) {
     setBusy(true);
     setNotice(null);
     const { error } = await supabase
@@ -160,7 +203,7 @@ export default function TasksClient({ tasks, employees, currentUserId }) {
     setBusy(false);
   }
 
-  function openReview(t) {
+  function openReview(t: HrTask) {
     setReviewingId(t.id);
     setFeedback(t.latest_submission?.hr_feedback ?? "");
     setNotice(null);
@@ -171,7 +214,7 @@ export default function TasksClient({ tasks, employees, currentUserId }) {
   }
 
   // decision = 'completed' (approve) or 'needs_revision' (return)
-  async function review(task, decision) {
+  async function review(task: HrTask, decision: "completed" | "needs_revision") {
     setReviewBusy(true);
     setNotice(null);
 
@@ -266,7 +309,9 @@ export default function TasksClient({ tasks, employees, currentUserId }) {
               <Label>Priority</Label>
               <select
                 value={form.priority}
-                onChange={(e) => set("priority", e.target.value)}
+                // A <select> value is always `string`, so assert it back to
+                // Priority — safe because the only options are the three below.
+                onChange={(e) => set("priority", e.target.value as Priority)}
                 className={FIELD}
               >
                 <option value="high">High</option>

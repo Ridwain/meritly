@@ -6,16 +6,22 @@ import { Paperclip, Play, Clock, Send, X } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabaseClient";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Badge, StatusBadge } from "@/components/ui/Badge";
+import { Badge, type BadgeTone, StatusBadge } from "@/components/ui/Badge";
 import { Label } from "@/components/ui/Label";
+import type { MyTask, Notice, Priority, TaskStatus } from "@/lib/types";
 
-const PRIORITY_TONE = { high: "danger", medium: "warning", low: "neutral" };
+// Record<Priority, BadgeTone> means a new priority can't be forgotten here.
+const PRIORITY_TONE: Record<Priority, BadgeTone> = {
+  high: "danger",
+  medium: "warning",
+  low: "neutral",
+};
 // Statuses from which an employee may submit work.
-const CAN_SUBMIT = ["in_progress", "needs_revision", "overdue"];
+const CAN_SUBMIT: TaskStatus[] = ["in_progress", "needs_revision", "overdue"];
 const FIELD =
   "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20";
 
-function formatDeadline(ts) {
+function formatDeadline(ts: string): string {
   return new Date(ts).toLocaleString("en-US", {
     day: "numeric",
     month: "short",
@@ -25,18 +31,25 @@ function formatDeadline(ts) {
   });
 }
 
-export default function MyTasksClient({ tasks, userId }) {
+export type MyTasksClientProps = {
+  tasks: MyTask[];
+  userId: string;
+};
+
+export default function MyTasksClient({ tasks, userId }: MyTasksClientProps) {
   const router = useRouter();
   const supabase = createSupabaseBrowserClient();
-  const fileRef = useRef(null);
+  // useRef<HTMLInputElement>(null) — tells TS this ref points at a file input,
+  // so fileRef.current.files is known to exist.
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  const [busyId, setBusyId] = useState(null); // task being "started"
-  const [submittingId, setSubmittingId] = useState(null); // task whose submit form is open
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
-  const [notice, setNotice] = useState(null);
+  const [notice, setNotice] = useState<Notice | null>(null);
 
-  async function start(id) {
+  async function start(id: string) {
     setBusyId(id);
     setNotice(null);
     const { error } = await supabase
@@ -48,7 +61,7 @@ export default function MyTasksClient({ tasks, userId }) {
     setBusyId(null);
   }
 
-  function openSubmit(id) {
+  function openSubmit(id: string) {
     setSubmittingId(id);
     setNote("");
     setNotice(null);
@@ -60,12 +73,12 @@ export default function MyTasksClient({ tasks, userId }) {
     if (fileRef.current) fileRef.current.value = "";
   }
 
-  async function submitWork(task) {
+  async function submitWork(task: MyTask) {
     setSaving(true);
     setNotice(null);
 
     // 1) Optional file upload (into the employee's own folder).
-    let file_url = null;
+    let file_url: string | null = null;
     const file = fileRef.current?.files?.[0];
     if (file) {
       const path = `${userId}/${task.id}-${Date.now()}-${file.name}`;

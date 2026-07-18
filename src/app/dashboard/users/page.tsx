@@ -1,6 +1,7 @@
 // User management page (Server Component). HR + admin only.
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import type { RoleName, UserRow } from "@/lib/types";
 import UsersTable from "./UsersTable";
 
 export default async function UsersPage() {
@@ -24,8 +25,8 @@ export default async function UsersPage() {
 
   return (
     <UsersTable
-      viewer={{ id: user.id, role }}
-      initialUsers={users ?? []}
+      viewer={{ id: user.id, role: role as RoleName }}
+      initialUsers={(users ?? []) as UserRow[]}
       roles={roles ?? []}
     />
   );

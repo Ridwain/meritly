@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { UserPlus } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabaseClient";
@@ -10,22 +10,43 @@ import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
+import type { Notice, RoleOption, UserRow, Viewer } from "@/lib/types";
+
+// What a profile UPDATE may change from this screen. The database's triggers
+// still decide if it's allowed — this just describes the shape we send.
+type ProfileChanges = {
+  role_id?: number;
+  deleted_at?: string | null;
+};
+
+export type UsersTableProps = {
+  viewer: Viewer;
+  initialUsers: UserRow[];
+  roles: RoleOption[];
+};
 
 // Interactive user-management table. Role changes / archiving are plain profile
 // UPDATEs sent with the browser client — the database's RLS + triggers decide
 // what's actually allowed. Inviting needs the privileged API route.
-export default function UsersTable({ viewer, initialUsers, roles }) {
+export default function UsersTable({
+  viewer,
+  initialUsers,
+  roles,
+}: UsersTableProps) {
   const router = useRouter();
   const supabase = createSupabaseBrowserClient();
-  const roleId = Object.fromEntries(roles.map((r) => [r.name, r.id]));
+  const roleId: Record<string, number> = Object.fromEntries(
+    roles.map((r) => [r.name, r.id])
+  );
 
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
   const [inviting, setInviting] = useState(false);
-  const [notice, setNotice] = useState(null); // { type, text }
-  const [busyId, setBusyId] = useState(null);
+  // <Notice | null> — the state is either a message or nothing.
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  async function invite(e) {
+  async function invite(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setInviting(true);
     setNotice(null);
@@ -46,7 +67,7 @@ export default function UsersTable({ viewer, initialUsers, roles }) {
     setInviting(false);
   }
 
-  async function apply(userId, changes) {
+  async function apply(userId: string, changes: ProfileChanges) {
     setBusyId(userId);
     setNotice(null);
     const { error } = await supabase
@@ -58,14 +79,14 @@ export default function UsersTable({ viewer, initialUsers, roles }) {
     setBusyId(null);
   }
 
-  function statusBadge(u) {
+  function statusBadge(u: UserRow): ReactNode {
     if (u.deleted_at) return <Badge tone="neutral">Archived</Badge>;
     if (!u.has_password) return <Badge tone="warning">Invited</Badge>;
     return <Badge tone="success">Active</Badge>;
   }
 
   // Which buttons a viewer sees for a target (UI hint; RLS is the real gate).
-  function actionsFor(u) {
+  function actionsFor(u: UserRow): ReactNode {
     if (u.id === viewer.id)
       return <span className="text-xs text-slate-400">You</span>;
     if (u.role === "admin")
@@ -74,7 +95,7 @@ export default function UsersTable({ viewer, initialUsers, roles }) {
     const canManageEmployee = viewer.role === "admin" || viewer.role === "hr";
     const canManageHr = viewer.role === "admin";
     const busy = busyId === u.id;
-    const btns = [];
+    const btns: ReactNode[] = [];
 
     if (u.deleted_at) {
       if ((u.role === "employee" && canManageEmployee) || (u.role === "hr" && canManageHr))
