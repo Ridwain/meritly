@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
+import { isValidEmail } from "@/lib/validation";
 import type { Notice, RoleOption, UserRow, Viewer } from "@/lib/types";
 
 // What a profile UPDATE may change from this screen. The database's triggers
@@ -48,8 +49,12 @@ export default function UsersTable({
 
   async function invite(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setInviting(true);
     setNotice(null);
+    if (!isValidEmail(email)) {
+      setNotice({ type: "error", text: "Invalid email." });
+      return;
+    }
+    setInviting(true);
     const res = await fetch("/api/invite-user", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

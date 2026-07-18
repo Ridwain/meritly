@@ -5,6 +5,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
+import { isValidEmail } from "@/lib/validation";
 
 type InviteBody = {
   email?: string;
@@ -19,6 +20,12 @@ export async function POST(request: NextRequest) {
       { error: "Email and full name are required." },
       { status: 400 }
     );
+  }
+
+  // The UI checks this too (instant feedback), but that check can be
+  // bypassed by calling this route directly — so it must be re-checked here.
+  if (!isValidEmail(email)) {
+    return NextResponse.json({ error: "Invalid email." }, { status: 400 });
   }
 
   // 1) Who is calling? (server client = the logged-in user's session)
