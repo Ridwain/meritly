@@ -1,5 +1,6 @@
 "use client";
 
+import type { ComponentType, SVGProps } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -15,7 +16,10 @@ import { Avatar } from "@/components/ui/Avatar";
 import { cn } from "@/lib/cn";
 
 // Icon per nav route. usePathname() (client-only) tells us which link is active.
-const ICONS = {
+// Record<string, IconComponent> lets us look up by any href and fall back.
+type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
+
+const ICONS: Record<string, IconComponent> = {
   "/dashboard": LayoutDashboard,
   "/dashboard/tasks": ClipboardList,
   "/dashboard/my-tasks": ListChecks,
@@ -24,7 +28,20 @@ const ICONS = {
   "/dashboard/users": UserCog,
 };
 
-export default function Sidebar({ nav, user }) {
+export type NavItem = {
+  href: string;
+  label: string;
+};
+
+export type SidebarProps = {
+  nav: NavItem[];
+  user: {
+    full_name: string;
+    roleLabel: string;
+  };
+};
+
+export default function Sidebar({ nav, user }: SidebarProps) {
   const pathname = usePathname();
 
   return (

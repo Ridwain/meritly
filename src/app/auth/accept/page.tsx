@@ -1,12 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseClient";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
+
+// The three states this page can be in. Typing it as a union means a typo like
+// setStatus("redy") is a compile error.
+type AcceptStatus = "loading" | "ready" | "invalid";
 
 // The page an invited user lands on after clicking their email link.
 // The link carries a one-time session (in the URL). We turn that into a real
@@ -15,7 +19,7 @@ export default function AcceptInvitePage() {
   const router = useRouter();
   const supabase = createSupabaseBrowserClient();
 
-  const [status, setStatus] = useState("loading"); // loading | ready | invalid
+  const [status, setStatus] = useState<AcceptStatus>("loading");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -53,7 +57,7 @@ export default function AcceptInvitePage() {
     init();
   }, [supabase]);
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
     setSaving(true);

@@ -1,6 +1,6 @@
 "use client"; // interactive form => must run in the browser
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseClient";
 import { Card } from "@/components/ui/Card";
@@ -14,6 +14,8 @@ export default function LoginPage() {
   const router = useRouter();
   const supabase = createSupabaseBrowserClient();
 
+  // useState infers the type from the initial value ("" -> string), so these
+  // don't need explicit annotations.
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -25,7 +27,8 @@ export default function LoginPage() {
     if (params.get("deactivated") === "1") setDeactivated(true);
   }, []);
 
-  async function handleSubmit(e) {
+  // FormEvent<HTMLFormElement> is the type of a form's submit event.
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
     setLoading(true);

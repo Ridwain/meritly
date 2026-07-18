@@ -1,10 +1,14 @@
 // Server Component: auth check + role-based shell. The interactive sidebar
 // (active-link highlighting) lives in the client Sidebar component.
+import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
-import Sidebar from "./Sidebar";
+import type { RoleName } from "@/lib/types";
+import Sidebar, { type NavItem } from "./Sidebar";
 
-const NAV_BY_ROLE = {
+// Record<RoleName, ...> means adding a role to the union forces us to give it
+// a nav list here — TypeScript won't let us forget.
+const NAV_BY_ROLE: Record<RoleName, NavItem[]> = {
   employee: [
     { href: "/dashboard", label: "Overview" },
     { href: "/dashboard/my-tasks", label: "My Tasks" },
@@ -16,12 +20,27 @@ const NAV_BY_ROLE = {
     { href: "/dashboard/performance", label: "Performance" },
     { href: "/dashboard/users", label: "Users" },
   ],
+  // admin sees the same links as HR (the Users page exposes extra controls)
+  admin: [
+    { href: "/dashboard", label: "Overview" },
+    { href: "/dashboard/tasks", label: "Tasks" },
+    { href: "/dashboard/employees", label: "Employees" },
+    { href: "/dashboard/performance", label: "Performance" },
+    { href: "/dashboard/users", label: "Users" },
+  ],
 };
-NAV_BY_ROLE.admin = NAV_BY_ROLE.hr;
 
-const ROLE_LABELS = { employee: "Employee", hr: "HR", admin: "Admin" };
+const ROLE_LABELS: Record<RoleName, string> = {
+  employee: "Employee",
+  hr: "HR",
+  admin: "Admin",
+};
 
-export default async function DashboardLayout({ children }) {
+export default async function DashboardLayout({
+  children,
+}: {
+  children: ReactNode;
+}) {
   const supabase = await createSupabaseServerClient();
 
   const {
@@ -37,7 +56,8 @@ export default async function DashboardLayout({ children }) {
 
   if (!profile || profile.deleted_at) redirect("/login?deactivated=1");
 
-  const role = profile.roles.name;
+  // The DB gives us `string`; narrow it to our RoleName union.
+  const role = (profile.roles as { name: string } | null)?.name as RoleName;
   const nav = NAV_BY_ROLE[role] ?? NAV_BY_ROLE.employee;
 
   return (

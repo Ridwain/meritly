@@ -1,12 +1,21 @@
+import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { Card } from "@/components/ui/Card";
 import { CheckCircle2 } from "lucide-react";
+import type { RoleName } from "@/lib/types";
+
+const ROLE_LABELS: Record<RoleName, string> = {
+  employee: "Employee",
+  hr: "HR",
+  admin: "Admin",
+};
 
 export default async function DashboardOverview() {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -14,12 +23,11 @@ export default async function DashboardOverview() {
     .eq("id", user.id)
     .single();
 
-  const role = profile?.roles?.name;
-  const roleLabel =
-    { employee: "Employee", hr: "HR", admin: "Admin" }[role] ?? role;
+  const role = (profile?.roles as { name: string } | null)?.name as RoleName;
+  const roleLabel = ROLE_LABELS[role] ?? role;
   const firstName = profile?.full_name?.split(" ")[0] ?? "there";
 
-  const items =
+  const items: string[] =
     role === "employee"
       ? [
           "See tasks assigned to you under My Tasks.",
