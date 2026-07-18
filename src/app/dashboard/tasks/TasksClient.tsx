@@ -325,6 +325,12 @@ export default function TasksClient({
                 type="datetime-local"
                 required
                 value={form.deadline}
+                // Only block past dates when ASSIGNING a new task. An
+                // existing task can legitimately already be overdue — if
+                // this also applied while editing, HR couldn't save any
+                // other change on it without being forced to push the
+                // deadline forward too.
+                min={editingId ? undefined : toInputValue(new Date().toISOString())}
                 onChange={(e) => set("deadline", e.target.value)}
               />
             </div>
