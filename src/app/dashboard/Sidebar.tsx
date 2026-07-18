@@ -8,7 +8,6 @@ import {
   ClipboardList,
   ListChecks,
   Users,
-  BarChart3,
   UserCog,
   LogOut,
 } from "lucide-react";
@@ -24,7 +23,6 @@ const ICONS: Record<string, IconComponent> = {
   "/dashboard/tasks": ClipboardList,
   "/dashboard/my-tasks": ListChecks,
   "/dashboard/employees": Users,
-  "/dashboard/performance": BarChart3,
   "/dashboard/users": UserCog,
 };
 

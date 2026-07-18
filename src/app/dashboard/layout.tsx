@@ -17,7 +17,6 @@ const NAV_BY_ROLE: Record<RoleName, NavItem[]> = {
     { href: "/dashboard", label: "Overview" },
     { href: "/dashboard/tasks", label: "Tasks" },
     { href: "/dashboard/employees", label: "Employees" },
-    { href: "/dashboard/performance", label: "Performance" },
     { href: "/dashboard/users", label: "Users" },
   ],
   // admin sees the same links as HR (the Users page exposes extra controls)
@@ -25,7 +24,6 @@ const NAV_BY_ROLE: Record<RoleName, NavItem[]> = {
     { href: "/dashboard", label: "Overview" },
     { href: "/dashboard/tasks", label: "Tasks" },
     { href: "/dashboard/employees", label: "Employees" },
-    { href: "/dashboard/performance", label: "Performance" },
     { href: "/dashboard/users", label: "Users" },
   ],
 };
