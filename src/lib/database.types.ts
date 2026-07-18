@@ -16,6 +16,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_log: {
+        Row: {
+          created_at: string
+          employee_id: string
+          event: string
+          id: string
+          task_id: string
+        }
+        Insert: {
+          created_at?: string
+          employee_id: string
+          event: string
+          id?: string
+          task_id: string
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string
+          event?: string
+          id?: string
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_log_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_log_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       permissions: {
         Row: {
           id: number

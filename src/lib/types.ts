@@ -18,6 +18,10 @@ export type Priority = "high" | "medium" | "low";
 
 export type RoleName = "admin" | "hr" | "employee";
 
+// activity_log.event reuses the TaskStatus vocabulary — every status a task
+// can be in is also an event worth logging.
+export type ActivityEvent = TaskStatus;
+
 // Table row shapes, straight from the generated schema types.
 export type TaskRow = Tables<"tasks">;
 export type ProfileRow = Tables<"profiles">;
@@ -109,4 +113,31 @@ export type HrTask = {
   attachment_name: string | null;
   assignee_name: string;
   latest_submission: LatestSubmission | null;
+};
+
+// One employee row on the Employees list (Feature 9): identity plus a quick
+// completed/total count so HR can scan performance before drilling in.
+export type EmployeeSummary = {
+  id: string;
+  full_name: string;
+  email: string;
+  totalTasks: number;
+  completedTasks: number;
+};
+
+// The two rates shown as KPI tiles on the Performance page. Both are 0 (not
+// NaN) when there is no data yet — see computeRates() in lib/stats.ts.
+export type PerformanceRates = {
+  totalTasks: number;
+  completedTasks: number;
+  completionRate: number; // percent, 0-100
+  onTimeRate: number; // percent of *submitted* tasks that beat their deadline
+};
+
+// One raw activity_log row, as read for the trend chart. The chart buckets
+// these by day itself (client-side, so bucketing uses the viewer's own
+// timezone — see PerformanceChart.tsx).
+export type ActivityRow = {
+  event: ActivityEvent;
+  created_at: string;
 };
