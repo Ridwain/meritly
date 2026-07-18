@@ -1,12 +1,17 @@
 import { cn } from "@/lib/cn";
 
-function initials(name = "") {
+function initials(name = ""): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   return parts.slice(0, 2).map((w) => w[0]?.toUpperCase()).join("") || "?";
 }
 
+export type AvatarProps = {
+  name: string;
+  className?: string;
+};
+
 // Initials circle. Override size/colors via className.
-export function Avatar({ name, className }) {
+export function Avatar({ name, className }: AvatarProps) {
   return (
     <div
       className={cn(
