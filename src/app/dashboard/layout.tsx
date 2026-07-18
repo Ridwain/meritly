@@ -50,11 +50,18 @@ export default async function DashboardLayout({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, deleted_at, roles(name)")
+    .select("full_name, deleted_at, accepted_at, roles(name)")
     .eq("id", user.id)
     .single();
 
   if (!profile || profile.deleted_at) redirect("/login?deactivated=1");
+
+  // Opening the invite link already creates a valid login session (Supabase's
+  // invite link IS a one-time login token) — but that is not the same as
+  // having finished onboarding. Send anyone who hasn't submitted the
+  // "set your password" form yet back to finish it, instead of letting them
+  // into the dashboard on an unfinished account.
+  if (!profile.accepted_at) redirect("/auth/accept");
 
   // The DB gives us `string`; narrow it to our RoleName union.
   const role = (profile.roles as { name: string } | null)?.name as RoleName;

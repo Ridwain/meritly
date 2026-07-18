@@ -37,13 +37,17 @@ export type AssignableEmployee = {
 };
 
 // A row returned by the admin_list_users() database function.
+// `accepted` reflects profiles.accepted_at, set by our own app the moment the
+// invitee actually submits their new-password form — NOT the moment they
+// merely open the invite email (see accept/page.tsx for why that distinction
+// matters: Supabase's invite link is itself a one-time login token).
 export type UserRow = {
   id: string;
   full_name: string;
   role: RoleName;
   email: string;
   deleted_at: string | null;
-  has_password: boolean;
+  accepted: boolean;
 };
 
 // Who is looking at the Users page (decides which buttons render).

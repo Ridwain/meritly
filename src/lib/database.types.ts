@@ -33,6 +33,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          accepted_at: string | null
           created_at: string
           deleted_at: string | null
           full_name: string
@@ -40,6 +41,7 @@ export type Database = {
           role_id: number
         }
         Insert: {
+          accepted_at?: string | null
           created_at?: string
           deleted_at?: string | null
           full_name: string
@@ -47,6 +49,7 @@ export type Database = {
           role_id: number
         }
         Update: {
+          accepted_at?: string | null
           created_at?: string
           deleted_at?: string | null
           full_name?: string
@@ -278,10 +281,10 @@ export type Database = {
       admin_list_users: {
         Args: never
         Returns: {
+          accepted: boolean
           deleted_at: string
           email: string
           full_name: string
-          has_password: boolean
           id: string
           role: string
         }[]

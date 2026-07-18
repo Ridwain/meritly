@@ -61,12 +61,25 @@ export default function AcceptInvitePage() {
     e.preventDefault();
     setError("");
     setSaving(true);
-    const { error } = await supabase.auth.updateUser({ password });
+    const { data, error } = await supabase.auth.updateUser({ password });
     if (error) {
       setError(error.message);
       setSaving(false);
       return;
     }
+
+    // Mark the invite as genuinely accepted — right here, right now. This is
+    // the one moment that should flip "Invited" -> "Active", not merely
+    // opening the email link (Supabase's invite link is itself a one-time
+    // login token, so a session already exists before this point — but the
+    // person hadn't chosen a password until this line runs).
+    if (data.user) {
+      await supabase
+        .from("profiles")
+        .update({ accepted_at: new Date().toISOString() })
+        .eq("id", data.user.id);
+    }
+
     router.push("/dashboard");
     router.refresh();
   }

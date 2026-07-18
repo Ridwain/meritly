@@ -81,7 +81,7 @@ export default function UsersTable({
 
   function statusBadge(u: UserRow): ReactNode {
     if (u.deleted_at) return <Badge tone="neutral">Archived</Badge>;
-    if (!u.has_password) return <Badge tone="warning">Invited</Badge>;
+    if (!u.accepted) return <Badge tone="warning">Invited</Badge>;
     return <Badge tone="success">Active</Badge>;
   }
 
