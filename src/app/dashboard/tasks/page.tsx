@@ -45,13 +45,16 @@ export default async function TasksPage() {
   await supabase.rpc("flag_overdue_tasks");
 
   // All active (non-archived) tasks, newest first.
-  const { data: tasks } = await supabase
-    .from("tasks")
-    .select(
-      "id, title, description, assigned_to, priority, deadline, status, created_at, attachment_url, attachment_name"
-    )
-    .is("deleted_at", null)
-    .order("created_at", { ascending: false });
+  const [{ data: tasks }, { data: queueRows }] = await Promise.all([
+    supabase
+      .from("tasks")
+      .select(
+        "id, title, description, assigned_to, priority, deadline, status, created_at, attachment_url, attachment_name"
+      )
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false }),
+    supabase.rpc("offboarding_queue"),
+  ]);
 
   // Names for display (assignee column can include archived/old people).
   const { data: profiles } = await supabase
@@ -83,12 +86,18 @@ export default async function TasksPage() {
     if (!latestByTask[s.task_id]) latestByTask[s.task_id] = s;
   }
 
+  const queueByTask = new Map(
+    (queueRows ?? []).map((row) => [row.task_id, row])
+  );
+
   // Cast to the narrowed HrTask shape here — the DB types give status/priority
   // as plain `string` because we used CHECK constraints rather than enums.
   const tasksWithNames = (tasks ?? []).map((t) => ({
     ...t,
     assignee_name: nameById[t.assigned_to] ?? "Unknown",
     latest_submission: latestByTask[t.id] ?? null,
+    custody_category: queueByTask.get(t.id)?.category ?? null,
+    assignee_state: queueByTask.get(t.id)?.assignee_state ?? null,
   })) as HrTask[];
 
   return (

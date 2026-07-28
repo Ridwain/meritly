@@ -51,6 +51,12 @@ const PERMISSION_NOTES: Record<string, string> = {
     "Full performance metrics also need View all tasks and Review submissions.",
   "rating.create": "The rating form arrives with Feature 10.",
   "rating.view_all": "The rating history UI arrives with Feature 10.",
+  "user.promote":
+    "Role changes work alone; optional work transfer also needs View all tasks and Edit tasks.",
+  "user.archive":
+    "Archiving works alone; optional work transfer also needs View all tasks and Edit tasks.",
+  "user.manage_all":
+    "User management works alone; optional work transfer also needs View all tasks and Edit tasks.",
 };
 
 function permissionPair(roleId: number, permissionId: number): string {
@@ -264,6 +270,23 @@ export default function RolesClient({
                 ]
               : [];
           });
+          const managesLifecycle = [
+            "user.promote",
+            "user.archive",
+            "user.manage_all",
+          ].some((key) => grantedKeys.has(key));
+          const transferMissing = ["task.view_all", "task.update"].filter(
+            (key) => !grantedKeys.has(key)
+          );
+          const guidance =
+            managesLifecycle && transferMissing.length > 0
+              ? [
+                  ...incomplete,
+                  `Optional offboarding transfer also needs ${transferMissing
+                    .map((item) => PERMISSION_LABELS[item] ?? item)
+                    .join(" + ")}`,
+                ]
+              : incomplete;
 
           return (
             <Card key={role.id} className="p-5">
@@ -300,11 +323,11 @@ export default function RolesClient({
                 </label>
               </div>
 
-              {!role.protected && incomplete.length > 0 && (
+              {!role.protected && guidance.length > 0 && (
                 <div className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                  <p className="font-medium">Incomplete permission bundle</p>
+                  <p className="font-medium">Permission bundle guidance</p>
                   <ul className="mt-1 list-disc space-y-0.5 pl-4">
-                    {incomplete.map((message) => (
+                    {guidance.map((message) => (
                       <li key={message}>{message}.</li>
                     ))}
                   </ul>

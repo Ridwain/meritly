@@ -6,6 +6,7 @@ import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { computeRates } from "@/lib/stats";
 import { Card } from "@/components/ui/Card";
 import { Avatar } from "@/components/ui/Avatar";
+import { Badge } from "@/components/ui/Badge";
 import type { ActivityRow, TaskStatus } from "@/lib/types";
 import PerformanceChart from "./PerformanceChart";
 
@@ -33,20 +34,14 @@ export default async function PerformancePage({
   const targetId = canViewAll ? emp : user.id;
   if (!targetId) redirect("/dashboard/employees");
 
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("full_name, roles(assignable_work)")
-    .eq("id", targetId)
-    .single();
-
-  const targetRole = profile?.roles as { assignable_work: boolean } | null;
-  // Performance managers can pick workers only. This prevents a crafted emp
-  // query from turning the worker dashboard into a general staff browser.
-  if (
-    profileError ||
-    !profile ||
-    (canViewAll && !targetRole?.assignable_work)
-  ) {
+  // The RPC accepts current workers or people with durable work history. It
+  // rejects arbitrary staff ids, while keeping archived/promoted employees
+  // reachable from the historical picker.
+  const { data: canOpenTarget } = await supabase.rpc(
+    "can_view_performance_subject",
+    { target: targetId }
+  );
+  if (!canOpenTarget) {
     return (
       <Card className="p-8 text-center text-sm text-slate-500">
         Employee not found.{" "}
@@ -58,6 +53,30 @@ export default async function PerformancePage({
       </Card>
     );
   }
+
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("full_name, deleted_at, roles(name, assignable_work)")
+    .eq("id", targetId)
+    .single();
+
+  if (profileError || !profile) {
+    return (
+      <Card className="p-8 text-center text-sm text-slate-500">
+        Employee not found.
+      </Card>
+    );
+  }
+
+  const targetRole = profile.roles as {
+    name: string;
+    assignable_work: boolean;
+  } | null;
+  const historyState = profile.deleted_at
+    ? "Archived"
+    : targetRole?.assignable_work
+      ? null
+      : "Promoted";
 
   const { data: tasks } = await supabase
     .from("tasks")
@@ -86,9 +105,16 @@ export default async function PerformancePage({
         <div className="flex items-center gap-3">
           <Avatar name={profile.full_name} />
           <div>
-            <h1 className="text-2xl font-semibold text-slate-900">
-              {profile.full_name}
-            </h1>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-semibold text-slate-900">
+                {profile.full_name}
+              </h1>
+              {historyState && (
+                <Badge tone={historyState === "Archived" ? "neutral" : "warning"}>
+                  {historyState}
+                </Badge>
+              )}
+            </div>
             <p className="text-sm text-slate-500">Performance overview</p>
           </div>
         </div>

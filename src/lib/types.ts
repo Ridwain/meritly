@@ -59,6 +59,22 @@ export type ViewerCapabilities = {
   manageAll: boolean;
   promote: boolean;
   archive: boolean;
+  taskViewAll: boolean;
+  taskUpdate: boolean;
+};
+
+export type UserWorkCounts = {
+  transferable: number;
+  submitted: number;
+};
+
+export type OffboardAction = "archive" | "role_change";
+
+export type LifecycleDialog = {
+  requestId: string;
+  user: UserRow;
+  action: OffboardAction;
+  targetRoleId: number | null;
 };
 
 // A row from the roles table, as the UI needs it.
@@ -134,6 +150,8 @@ export type HrTask = {
   attachment_name: string | null;
   assignee_name: string;
   latest_submission: LatestSubmission | null;
+  custody_category: "needs_reassignment" | "needs_review" | null;
+  assignee_state: "archived" | "unaccepted" | "non_worker" | "unknown" | null;
 };
 
 // One employee row on the Employees list (Feature 9): identity plus a quick
@@ -141,9 +159,23 @@ export type HrTask = {
 export type EmployeeSummary = {
   id: string;
   full_name: string;
-  email: string;
+  email: string | null;
+  role: string;
+  lifecycleStatus: "active" | "promoted" | "archived";
+  hasHistory: boolean;
   totalTasks: number;
   completedTasks: number;
+};
+
+export type HistoricalEmployee = {
+  id: string;
+  full_name: string;
+  role: string;
+  email: string | null;
+  deleted_at: string | null;
+  accepted: boolean;
+  current_assignable: boolean;
+  has_history: boolean;
 };
 
 // The two rates shown as KPI tiles on the Performance page. Both are 0 (not

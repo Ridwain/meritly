@@ -55,6 +55,155 @@ export type Database = {
           },
         ]
       }
+      task_assignment_history: {
+        Row: {
+          changed_by: string | null
+          created_at: string
+          from_user_id: string | null
+          id: string
+          reason: string | null
+          request_id: string | null
+          task_id: string
+          to_user_id: string
+        }
+        Insert: {
+          changed_by?: string | null
+          created_at?: string
+          from_user_id?: string | null
+          id?: string
+          reason?: string | null
+          request_id?: string | null
+          task_id: string
+          to_user_id: string
+        }
+        Update: {
+          changed_by?: string | null
+          created_at?: string
+          from_user_id?: string | null
+          id?: string
+          reason?: string | null
+          request_id?: string | null
+          task_id?: string
+          to_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_assignment_history_changed_by_fkey"
+            columns: ["changed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_assignment_history_from_user_id_fkey"
+            columns: ["from_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_assignment_history_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_assignment_history_to_user_id_fkey"
+            columns: ["to_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_lifecycle_events: {
+        Row: {
+          action: string
+          actor_id: string | null
+          actor_kind: string
+          created_at: string
+          id: string
+          new_role_id: number | null
+          previous_role_id: number | null
+          queued_task_count: number
+          reason: string
+          reassigned_task_count: number
+          replacement_user_id: string | null
+          request_id: string
+          submitted_task_count: number
+          target_user_id: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          actor_kind: string
+          created_at?: string
+          id?: string
+          new_role_id?: number | null
+          previous_role_id?: number | null
+          queued_task_count?: number
+          reason: string
+          reassigned_task_count?: number
+          replacement_user_id?: string | null
+          request_id: string
+          submitted_task_count?: number
+          target_user_id: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          actor_kind?: string
+          created_at?: string
+          id?: string
+          new_role_id?: number | null
+          previous_role_id?: number | null
+          queued_task_count?: number
+          reason?: string
+          reassigned_task_count?: number
+          replacement_user_id?: string | null
+          request_id?: string
+          submitted_task_count?: number
+          target_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_lifecycle_events_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_lifecycle_events_new_role_id_fkey"
+            columns: ["new_role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_lifecycle_events_previous_role_id_fkey"
+            columns: ["previous_role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_lifecycle_events_replacement_user_id_fkey"
+            columns: ["replacement_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_lifecycle_events_target_user_id_fkey"
+            columns: ["target_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       permissions: {
         Row: {
           id: number
@@ -344,11 +493,52 @@ export type Database = {
           id: string
         }[]
       }
+      can_view_performance_subject: {
+        Args: { target: string }
+        Returns: boolean
+      }
       flag_overdue_tasks: { Args: never; Returns: undefined }
       has_permission: { Args: { perm: string }; Returns: boolean }
+      historical_employees: {
+        Args: never
+        Returns: {
+          accepted: boolean
+          current_assignable: boolean
+          deleted_at: string | null
+          email: string | null
+          full_name: string
+          has_history: boolean
+          id: string
+          role: string
+        }[]
+      }
       is_active: { Args: never; Returns: boolean }
       is_assignable_employee: { Args: { target: string }; Returns: boolean }
       my_role: { Args: never; Returns: string }
+      offboard_user: {
+        Args: {
+          p_action: string
+          p_reason?: string | null
+          p_replacement_user_id?: string | null
+          p_request_id: string
+          p_target_role_id?: number | null
+          p_target_user_id: string
+        }
+        Returns: {
+          duplicate_request: boolean
+          queued_task_count: number
+          reassigned_task_count: number
+          submitted_task_count: number
+        }[]
+      }
+      offboarding_queue: {
+        Args: never
+        Returns: {
+          assignee_state: string
+          category: string
+          task_id: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

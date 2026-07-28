@@ -10,6 +10,7 @@ import {
   ClipboardCheck,
   Check,
   RotateCcw,
+  UserRoundX,
 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabaseClient";
 import { Card } from "@/components/ui/Card";
@@ -105,6 +106,23 @@ export default function TasksClient({
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState("");
   const [reviewBusy, setReviewBusy] = useState(false);
+  const [custodyFilter, setCustodyFilter] = useState<
+    "all" | "needs_reassignment" | "needs_review"
+  >("all");
+
+  const editingTask = editingId
+    ? tasks.find((task) => task.id === editingId)
+    : null;
+  const reassignmentCount = tasks.filter(
+    (task) => task.custody_category === "needs_reassignment"
+  ).length;
+  const needsReviewCount = tasks.filter(
+    (task) => task.custody_category === "needs_review"
+  ).length;
+  const visibleTasks =
+    custodyFilter === "all"
+      ? tasks
+      : tasks.filter((task) => task.custody_category === custodyFilter);
 
   // Generic setter: K is a key of TaskForm, and v must match that key's type,
   // so set("priority", "urgent") is a compile error.
@@ -297,17 +315,31 @@ export default function TasksClient({
                   required
                   value={form.assigned_to}
                   onChange={(e) => set("assigned_to", e.target.value)}
+                  disabled={editingTask?.status === "submitted"}
                   className={FIELD}
                 >
                   <option value="" disabled>
                     Select a worker
                   </option>
+                  {editingTask &&
+                    !employees.some(
+                      (employee) => employee.id === editingTask.assigned_to
+                    ) && (
+                      <option value={editingTask.assigned_to}>
+                        {editingTask.assignee_name}
+                      </option>
+                    )}
                   {employees.map((emp) => (
                     <option key={emp.id} value={emp.id}>
                       {emp.full_name}
                     </option>
                   ))}
                 </select>
+                {editingTask?.status === "submitted" && (
+                  <p className="mt-1 text-xs text-amber-700">
+                    Submitted work must stay with its original employee.
+                  </p>
+                )}
               </div>
               <div>
                 <Label>Priority</Label>
@@ -396,11 +428,68 @@ export default function TasksClient({
         </Card>
       )}
 
+      {(reassignmentCount > 0 || needsReviewCount > 0) && (
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() =>
+              setCustodyFilter((current) =>
+                current === "needs_reassignment"
+                  ? "all"
+                  : "needs_reassignment"
+              )
+            }
+            className={`rounded-xl border p-4 text-left transition-colors ${
+              custodyFilter === "needs_reassignment"
+                ? "border-rose-300 bg-rose-50"
+                : "border-slate-200 bg-white hover:border-rose-200"
+            }`}
+          >
+            <div className="flex items-center gap-2 text-rose-700">
+              <UserRoundX className="h-4 w-4" />
+              <span className="text-sm font-semibold">Needs reassignment</span>
+            </div>
+            <p className="mt-1 text-2xl font-semibold text-slate-900">
+              {reassignmentCount}
+            </p>
+            <p className="text-xs text-slate-500">
+              Work owned by an inactive or non-worker account.
+            </p>
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              setCustodyFilter((current) =>
+                current === "needs_review" ? "all" : "needs_review"
+              )
+            }
+            className={`rounded-xl border p-4 text-left transition-colors ${
+              custodyFilter === "needs_review"
+                ? "border-amber-300 bg-amber-50"
+                : "border-slate-200 bg-white hover:border-amber-200"
+            }`}
+          >
+            <div className="flex items-center gap-2 text-amber-700">
+              <ClipboardCheck className="h-4 w-4" />
+              <span className="text-sm font-semibold">Needs review</span>
+            </div>
+            <p className="mt-1 text-2xl font-semibold text-slate-900">
+              {needsReviewCount}
+            </p>
+            <p className="text-xs text-slate-500">
+              Submitted evidence kept with the original employee.
+            </p>
+          </button>
+        </div>
+      )}
+
       {/* Task list */}
       <Card className="mt-4 overflow-hidden">
-        {tasks.length === 0 ? (
+        {visibleTasks.length === 0 ? (
           <p className="px-5 py-10 text-center text-sm text-slate-500">
-            {capabilities.create
+            {tasks.length > 0
+              ? "No tasks match this custody filter."
+              : capabilities.create
               ? "No tasks yet. Assign your first task above."
               : "No active tasks."}
           </p>
@@ -418,7 +507,7 @@ export default function TasksClient({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {tasks.map((t) => (
+                {visibleTasks.map((t) => (
                   <Fragment key={t.id}>
                     <tr className="hover:bg-slate-50/60">
                       <td className="px-5 py-3">
@@ -450,6 +539,24 @@ export default function TasksClient({
                             {t.assignee_name}
                           </span>
                         </div>
+                        {t.custody_category && (
+                          <div className="mt-1">
+                            <Badge
+                              tone={
+                                t.custody_category === "needs_review"
+                                  ? "warning"
+                                  : "danger"
+                              }
+                            >
+                              {t.custody_category === "needs_review"
+                                ? "Needs review"
+                                : "Needs reassignment"}
+                              {t.assignee_state
+                                ? ` · ${t.assignee_state.replace("_", " ")}`
+                                : ""}
+                            </Badge>
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <Badge tone={PRIORITY_TONE[t.priority]}>
