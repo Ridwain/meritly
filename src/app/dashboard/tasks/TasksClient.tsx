@@ -23,6 +23,7 @@ import type {
   HrTask,
   Notice,
   Priority,
+  TaskCapabilities,
 } from "@/lib/types";
 
 const PRIORITY_TONE: Record<Priority, BadgeTone> = {
@@ -81,12 +82,14 @@ export type TasksClientProps = {
   tasks: HrTask[];
   employees: AssignableEmployee[];
   currentUserId: string;
+  capabilities: TaskCapabilities;
 };
 
 export default function TasksClient({
   tasks,
   employees,
   currentUserId,
+  capabilities,
 }: TasksClientProps) {
   const router = useRouter();
   const supabase = createSupabaseBrowserClient();
@@ -258,134 +261,148 @@ export default function TasksClient({
         Tasks
       </h1>
       <p className="mt-1 text-sm text-slate-500">
-        Assign work to employees and track it here.
+        Track work and use the actions allowed by your role.
       </p>
 
       {/* Create / edit form */}
-      <Card className="mt-6 p-5">
-        <h2 className="mb-4 text-sm font-semibold text-slate-900">
-          {editingId ? "Edit task" : "New task"}
-        </h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label>Title</Label>
-            <Input
-              required
-              value={form.title}
-              onChange={(e) => set("title", e.target.value)}
-              placeholder="Prepare Q3 report"
-            />
-          </div>
-          <div>
-            <Label>Description</Label>
-            <textarea
-              rows={2}
-              value={form.description}
-              onChange={(e) => set("description", e.target.value)}
-              placeholder="What needs to be done"
-              className={FIELD}
-            />
-          </div>
-          <div className="grid gap-4 sm:grid-cols-3">
+      {(capabilities.create || editingId) && (
+        <Card className="mt-6 p-5">
+          <h2 className="mb-4 text-sm font-semibold text-slate-900">
+            {editingId ? "Edit task" : "New task"}
+          </h2>
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <Label>Assignee</Label>
-              <select
-                required
-                value={form.assigned_to}
-                onChange={(e) => set("assigned_to", e.target.value)}
-                className={FIELD}
-              >
-                <option value="" disabled>
-                  Select an employee
-                </option>
-                {employees.map((emp) => (
-                  <option key={emp.id} value={emp.id}>
-                    {emp.full_name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <Label>Priority</Label>
-              <select
-                value={form.priority}
-                // A <select> value is always `string`, so assert it back to
-                // Priority — safe because the only options are the three below.
-                onChange={(e) => set("priority", e.target.value as Priority)}
-                className={FIELD}
-              >
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
-              </select>
-            </div>
-            <div>
-              <Label>Deadline</Label>
+              <Label>Title</Label>
               <Input
-                type="datetime-local"
                 required
-                value={form.deadline}
-                // Only block past dates when ASSIGNING a new task. An
-                // existing task can legitimately already be overdue — if
-                // this also applied while editing, HR couldn't save any
-                // other change on it without being forced to push the
-                // deadline forward too.
-                min={editingId ? undefined : toInputValue(new Date().toISOString())}
-                onChange={(e) => set("deadline", e.target.value)}
+                value={form.title}
+                onChange={(e) => set("title", e.target.value)}
+                placeholder="Prepare Q3 report"
               />
             </div>
-          </div>
+            <div>
+              <Label>Description</Label>
+              <textarea
+                rows={2}
+                value={form.description}
+                onChange={(e) => set("description", e.target.value)}
+                placeholder="What needs to be done"
+                className={FIELD}
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div>
+                <Label>Assignee</Label>
+                <select
+                  required
+                  value={form.assigned_to}
+                  onChange={(e) => set("assigned_to", e.target.value)}
+                  className={FIELD}
+                >
+                  <option value="" disabled>
+                    Select a worker
+                  </option>
+                  {employees.map((emp) => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.full_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label>Priority</Label>
+                <select
+                  value={form.priority}
+                  // A <select> value is always `string`, so assert it back to
+                  // Priority — safe because the only options are the three below.
+                  onChange={(e) => set("priority", e.target.value as Priority)}
+                  className={FIELD}
+                >
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
+              </div>
+              <div>
+                <Label>Deadline</Label>
+                <Input
+                  type="datetime-local"
+                  required
+                  value={form.deadline}
+                  // Only block past dates when ASSIGNING a new task. An
+                  // existing task can legitimately already be overdue — if
+                  // this also applied while editing, HR couldn't save any
+                  // other change on it without being forced to push the
+                  // deadline forward too.
+                  min={
+                    editingId
+                      ? undefined
+                      : toInputValue(new Date().toISOString())
+                  }
+                  onChange={(e) => set("deadline", e.target.value)}
+                />
+              </div>
+            </div>
 
-          <div>
-            <Label>Attachment (optional)</Label>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.webp,.txt,.zip"
-              className="block w-full text-sm text-slate-600 file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-brand-700 hover:file:bg-brand-100"
-            />
-            {editingId && editAttachment && (
-              <p className="mt-1 text-xs text-slate-500">
-                Current: {editAttachment} — choose a file to replace it.
+            <div>
+              <Label>Attachment (optional)</Label>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.webp,.txt,.zip"
+                className="block w-full text-sm text-slate-600 file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-brand-700 hover:file:bg-brand-100"
+              />
+              {editingId && editAttachment && (
+                <p className="mt-1 text-xs text-slate-500">
+                  Current: {editAttachment} — choose a file to replace it.
+                </p>
+              )}
+            </div>
+
+            {notice && !reviewingId && (
+              <p
+                className={`text-sm ${
+                  notice.type === "error"
+                    ? "text-rose-600"
+                    : "text-emerald-600"
+                }`}
+              >
+                {notice.text}
               </p>
             )}
-          </div>
 
-          {notice && !reviewingId && (
-            <p
-              className={`text-sm ${
-                notice.type === "error" ? "text-rose-600" : "text-emerald-600"
-              }`}
-            >
-              {notice.text}
-            </p>
-          )}
-
-          <div className="flex gap-2">
-            <Button type="submit" disabled={busy}>
-              {!editingId && <Plus className="h-4 w-4" />}
-              {busy ? "Saving…" : editingId ? "Save changes" : "Assign task"}
-            </Button>
-            {editingId && (
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={cancelEdit}
-                disabled={busy}
-              >
-                <X className="h-4 w-4" />
-                Cancel
+            <div className="flex gap-2">
+              <Button type="submit" disabled={busy}>
+                {!editingId && <Plus className="h-4 w-4" />}
+                {busy
+                  ? "Saving…"
+                  : editingId
+                    ? "Save changes"
+                    : "Assign task"}
               </Button>
-            )}
-          </div>
-        </form>
-      </Card>
+              {editingId && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={cancelEdit}
+                  disabled={busy}
+                >
+                  <X className="h-4 w-4" />
+                  Cancel
+                </Button>
+              )}
+            </div>
+          </form>
+        </Card>
+      )}
 
       {/* Task list */}
       <Card className="mt-4 overflow-hidden">
         {tasks.length === 0 ? (
           <p className="px-5 py-10 text-center text-sm text-slate-500">
-            No tasks yet. Assign your first task above.
+            {capabilities.create
+              ? "No tasks yet. Assign your first task above."
+              : "No active tasks."}
           </p>
         ) : (
           <div className="overflow-x-auto">
@@ -447,7 +464,7 @@ export default function TasksClient({
                       </td>
                       <td className="px-5 py-3">
                         <div className="flex justify-end gap-2">
-                          {t.status === "submitted" && (
+                          {capabilities.review && t.status === "submitted" && (
                             <Button
                               size="sm"
                               onClick={() => openReview(t)}
@@ -457,23 +474,32 @@ export default function TasksClient({
                               Review
                             </Button>
                           )}
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => startEdit(t)}
-                            disabled={busy}
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                            Edit
-                          </Button>
-                          <Button
-                            variant="danger"
-                            size="sm"
-                            onClick={() => archive(t.id)}
-                            disabled={busy}
-                          >
-                            Archive
-                          </Button>
+                          {capabilities.update && (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => startEdit(t)}
+                              disabled={busy}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                              Edit
+                            </Button>
+                          )}
+                          {capabilities.archive && (
+                            <Button
+                              variant="danger"
+                              size="sm"
+                              onClick={() => archive(t.id)}
+                              disabled={busy}
+                            >
+                              Archive
+                            </Button>
+                          )}
+                          {!capabilities.review &&
+                            !capabilities.update &&
+                            !capabilities.archive && (
+                              <span className="text-xs text-slate-400">—</span>
+                            )}
                         </div>
                       </td>
                     </tr>

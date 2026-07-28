@@ -188,16 +188,25 @@ export type Database = {
       }
       roles: {
         Row: {
+          assignable_work: boolean
+          hr_grantable: boolean
           id: number
           name: string
+          protected: boolean
         }
         Insert: {
+          assignable_work?: boolean
+          hr_grantable?: boolean
           id?: number
           name: string
+          protected?: boolean
         }
         Update: {
+          assignable_work?: boolean
+          hr_grantable?: boolean
           id?: number
           name?: string
+          protected?: boolean
         }
         Relationships: []
       }

@@ -1,38 +1,16 @@
-// Server Component: auth check + role-based shell. The interactive sidebar
+// Server Component: auth check + capability-based shell. The interactive sidebar
 // (active-link highlighting) lives in the client Sidebar component.
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
-import type { RoleName } from "@/lib/types";
 import Sidebar, { type NavItem } from "./Sidebar";
 
-// Record<RoleName, ...> means adding a role to the union forces us to give it
-// a nav list here — TypeScript won't let us forget.
-const NAV_BY_ROLE: Record<RoleName, NavItem[]> = {
-  employee: [
-    { href: "/dashboard", label: "Overview" },
-    { href: "/dashboard/my-tasks", label: "My Tasks" },
-  ],
-  hr: [
-    { href: "/dashboard", label: "Overview" },
-    { href: "/dashboard/tasks", label: "Tasks" },
-    { href: "/dashboard/employees", label: "Employees" },
-    { href: "/dashboard/users", label: "Users" },
-  ],
-  // admin sees the same links as HR (the Users page exposes extra controls)
-  admin: [
-    { href: "/dashboard", label: "Overview" },
-    { href: "/dashboard/tasks", label: "Tasks" },
-    { href: "/dashboard/employees", label: "Employees" },
-    { href: "/dashboard/users", label: "Users" },
-  ],
-};
-
-const ROLE_LABELS: Record<RoleName, string> = {
-  employee: "Employee",
-  hr: "HR",
-  admin: "Admin",
-};
+function roleLabel(name: string): string {
+  return name
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
 
 export default async function DashboardLayout({
   children,
@@ -48,7 +26,7 @@ export default async function DashboardLayout({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, deleted_at, accepted_at, roles(name)")
+    .select("full_name, deleted_at, accepted_at, roles(name, assignable_work)")
     .eq("id", user.id)
     .single();
 
@@ -61,9 +39,51 @@ export default async function DashboardLayout({
   // into the dashboard on an unfinished account.
   if (!profile.accepted_at) redirect("/auth/accept");
 
-  // The DB gives us `string`; narrow it to our RoleName union.
-  const role = (profile.roles as { name: string } | null)?.name as RoleName;
-  const nav = NAV_BY_ROLE[role] ?? NAV_BY_ROLE.employee;
+  const role = profile.roles as {
+    name: string;
+    assignable_work: boolean;
+  } | null;
+
+  const permissionKeys = [
+    "task.view_all",
+    "stats.view_all",
+    "user.invite",
+    "user.manage_all",
+    "user.promote",
+    "user.archive",
+    "role.manage",
+  ] as const;
+  const permissionResults = await Promise.all(
+    permissionKeys.map((perm) => supabase.rpc("has_permission", { perm }))
+  );
+  const can = Object.fromEntries(
+    permissionKeys.map((key, index) => [
+      key,
+      Boolean(permissionResults[index].data),
+    ])
+  ) as Record<(typeof permissionKeys)[number], boolean>;
+
+  const nav: NavItem[] = [{ href: "/dashboard", label: "Overview" }];
+  if (role?.assignable_work) {
+    nav.push({ href: "/dashboard/my-tasks", label: "My Tasks" });
+  }
+  if (can["task.view_all"]) {
+    nav.push({ href: "/dashboard/tasks", label: "Tasks" });
+  }
+  if (can["stats.view_all"]) {
+    nav.push({ href: "/dashboard/employees", label: "Employees" });
+  }
+  if (
+    can["user.invite"] ||
+    can["user.manage_all"] ||
+    can["user.promote"] ||
+    can["user.archive"]
+  ) {
+    nav.push({ href: "/dashboard/users", label: "Users" });
+  }
+  if (can["role.manage"]) {
+    nav.push({ href: "/dashboard/roles", label: "Roles" });
+  }
 
   return (
     <div className="flex min-h-screen bg-slate-50">
@@ -71,7 +91,7 @@ export default async function DashboardLayout({
         nav={nav}
         user={{
           full_name: profile.full_name,
-          roleLabel: ROLE_LABELS[role] ?? role,
+          roleLabel: role ? roleLabel(role.name) : "Unknown role",
         }}
       />
       <main className="min-w-0 flex-1">

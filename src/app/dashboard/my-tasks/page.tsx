@@ -12,6 +12,12 @@ export default async function MyTasksPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  // Ownership lets users read their assigned tasks. This separate capability
+  // decides whether those tasks are actionable or read-only.
+  const { data: canWork } = await supabase.rpc("has_permission", {
+    perm: "submission.create",
+  });
+
   // Flag any past-deadline tasks as overdue before we read them (Feature 8).
   await supabase.rpc("flag_overdue_tasks");
 
@@ -52,5 +58,11 @@ export default async function MyTasksPage() {
     latest_feedback: latestByTask[t.id]?.hr_feedback ?? null,
   })) as MyTask[];
 
-  return <MyTasksClient tasks={tasksWithNames} userId={user.id} />;
+  return (
+    <MyTasksClient
+      tasks={tasksWithNames}
+      userId={user.id}
+      canWork={Boolean(canWork)}
+    />
+  );
 }

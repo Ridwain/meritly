@@ -1,7 +1,11 @@
 // HR/admin Tasks page (Server Component): guard + data fetch.
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
-import type { AssignableEmployee, HrTask, LatestSubmission } from "@/lib/types";
+import type {
+  AssignableEmployee,
+  HrTask,
+  LatestSubmission,
+} from "@/lib/types";
 import TasksClient from "./TasksClient";
 
 export default async function TasksPage() {
@@ -18,6 +22,24 @@ export default async function TasksPage() {
     perm: "task.view_all",
   });
   if (!canView) redirect("/dashboard");
+
+  const [
+    { data: canCreate },
+    { data: canUpdate },
+    { data: canArchive },
+    { data: canReview },
+  ] = await Promise.all([
+    supabase.rpc("has_permission", { perm: "task.create" }),
+    supabase.rpc("has_permission", { perm: "task.update" }),
+    supabase.rpc("has_permission", { perm: "task.archive" }),
+    supabase.rpc("has_permission", { perm: "submission.review" }),
+  ]);
+  const capabilities = {
+    create: Boolean(canCreate),
+    update: Boolean(canUpdate),
+    archive: Boolean(canArchive),
+    review: Boolean(canReview),
+  };
 
   // Flag any past-deadline tasks as overdue before we read them (Feature 8).
   await supabase.rpc("flag_overdue_tasks");
@@ -39,17 +61,22 @@ export default async function TasksPage() {
     (profiles ?? []).map((p) => [p.id, p.full_name])
   );
 
-  // Dropdown: only employees who are active AND accepted their invite
+  // Dropdown: only workers who are active AND accepted their invite
   // (set a password). The DB function enforces the same rule as the
   // tasks_insert policy, so the UI and the security rule can't drift.
-  const { data: employees } = await supabase.rpc("assignable_employees");
+  const { data: employees } =
+    capabilities.create || capabilities.update
+      ? await supabase.rpc("assignable_employees")
+      : { data: [] };
 
   // Latest submission per task — the review panel shows the newest one.
   // RLS lets HR (submission.review) read every submission.
-  const { data: subs } = await supabase
-    .from("submissions")
-    .select("id, task_id, note, file_url, hr_feedback, submitted_at")
-    .order("submitted_at", { ascending: false });
+  const { data: subs } = capabilities.review
+    ? await supabase
+        .from("submissions")
+        .select("id, task_id, note, file_url, hr_feedback, submitted_at")
+        .order("submitted_at", { ascending: false })
+    : { data: [] };
 
   const latestByTask: Record<string, LatestSubmission> = {};
   for (const s of subs ?? []) {
@@ -69,6 +96,7 @@ export default async function TasksPage() {
       tasks={tasksWithNames}
       employees={(employees ?? []) as AssignableEmployee[]}
       currentUserId={user.id}
+      capabilities={capabilities}
     />
   );
 }

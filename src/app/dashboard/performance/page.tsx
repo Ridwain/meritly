@@ -35,11 +35,18 @@ export default async function PerformancePage({
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("full_name")
+    .select("full_name, roles(assignable_work)")
     .eq("id", targetId)
     .single();
 
-  if (profileError || !profile) {
+  const targetRole = profile?.roles as { assignable_work: boolean } | null;
+  // Performance managers can pick workers only. This prevents a crafted emp
+  // query from turning the worker dashboard into a general staff browser.
+  if (
+    profileError ||
+    !profile ||
+    (canViewAll && !targetRole?.assignable_work)
+  ) {
     return (
       <Card className="p-8 text-center text-sm text-slate-500">
         Employee not found.{" "}

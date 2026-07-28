@@ -23,11 +23,17 @@ export default async function EmployeesPage() {
   });
   if (!canView) redirect("/dashboard");
 
-  // admin_list_users() already scopes HR to employees-only (never other
-  // HR/admin) and never includes yourself. Admin sees every role, so we
-  // still filter to role === 'employee' below — this page is specifically
-  // about employee performance.
-  const { data: users } = await supabase.rpc("admin_list_users");
+  // The RPC scopes limited viewers to workers. Full managers may receive every
+  // role, so the role flags below remain the single source of worker truth.
+  const [{ data: users }, { data: roles }] = await Promise.all([
+    supabase.rpc("admin_list_users"),
+    supabase.from("roles").select("name, assignable_work"),
+  ]);
+  const workerRoleNames = new Set(
+    (roles ?? [])
+      .filter((role) => role.assignable_work)
+      .map((role) => role.name)
+  );
 
   // Tasks not archived, so we can total up completed/total per employee.
   const { data: tasks } = await supabase
@@ -48,7 +54,7 @@ export default async function EmployeesPage() {
   // keeps this list meaningfully about performance, not invite status
   // (that's what the Users page is for).
   const employees: EmployeeSummary[] = ((users ?? []) as UserRow[])
-    .filter((u) => u.role === "employee" && u.accepted)
+    .filter((u) => workerRoleNames.has(u.role) && u.accepted)
     .map((u) => ({
       id: u.id,
       full_name: u.full_name,

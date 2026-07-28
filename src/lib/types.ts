@@ -16,8 +16,6 @@ export type TaskStatus =
 
 export type Priority = "high" | "medium" | "low";
 
-export type RoleName = "admin" | "hr" | "employee";
-
 // activity_log.event reuses the TaskStatus vocabulary — every status a task
 // can be in is also an event worth logging.
 export type ActivityEvent = TaskStatus;
@@ -48,22 +46,45 @@ export type AssignableEmployee = {
 export type UserRow = {
   id: string;
   full_name: string;
-  role: RoleName;
+  role: string;
   email: string;
   deleted_at: string | null;
   accepted: boolean;
 };
 
-// Who is looking at the Users page (decides which buttons render).
-export type Viewer = {
-  id: string;
-  role: RoleName;
+// Capabilities decide which controls render. Role names are deliberately absent
+// so a custom role works as soon as its permission keyring changes.
+export type ViewerCapabilities = {
+  invite: boolean;
+  manageAll: boolean;
+  promote: boolean;
+  archive: boolean;
 };
 
 // A row from the roles table, as the UI needs it.
 export type RoleOption = {
   id: number;
   name: string;
+  assignable_work: boolean;
+  protected: boolean;
+  hr_grantable: boolean;
+};
+
+export type PermissionOption = {
+  id: number;
+  key: string;
+};
+
+export type RolePermissionRow = {
+  role_id: number;
+  permission_id: number;
+};
+
+export type TaskCapabilities = {
+  create: boolean;
+  update: boolean;
+  archive: boolean;
+  review: boolean;
 };
 
 // Inline success/error message shown in the feature pages.

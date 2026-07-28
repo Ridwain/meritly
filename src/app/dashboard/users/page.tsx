@@ -1,7 +1,8 @@
-// User management page (Server Component). HR + admin only.
+// User management page (Server Component). Capabilities, not role names, decide
+// who enters and which controls the client renders.
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
-import type { RoleName, UserRow } from "@/lib/types";
+import type { UserRow } from "@/lib/types";
 import UsersTable from "./UsersTable";
 
 export default async function UsersPage() {
@@ -12,20 +13,37 @@ export default async function UsersPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // admin_list_users() itself checks the user.invite permission and throws if
-  // the caller lacks it — so a plain employee hitting this URL gets bounced.
+  // The RPC accepts user-management capabilities and scopes non-full managers
+  // to worker rows. A caller with none of those capabilities is rejected.
   const { data: users, error } = await supabase.rpc("admin_list_users");
   if (error) redirect("/dashboard");
 
-  // Viewer's own role decides which buttons render.
-  const { data: role } = await supabase.rpc("my_role");
-
-  // Role id/name pairs so the client can map "hr" -> id when promoting.
-  const { data: roles } = await supabase.from("roles").select("id, name");
+  const [
+    { data: canInvite },
+    { data: canManageAll },
+    { data: canPromote },
+    { data: canArchive },
+    { data: roles },
+  ] = await Promise.all([
+    supabase.rpc("has_permission", { perm: "user.invite" }),
+    supabase.rpc("has_permission", { perm: "user.manage_all" }),
+    supabase.rpc("has_permission", { perm: "user.promote" }),
+    supabase.rpc("has_permission", { perm: "user.archive" }),
+    supabase
+      .from("roles")
+      .select("id, name, assignable_work, protected, hr_grantable")
+      .order("id"),
+  ]);
 
   return (
     <UsersTable
-      viewer={{ id: user.id, role: role as RoleName }}
+      viewerId={user.id}
+      viewerCaps={{
+        invite: Boolean(canInvite),
+        manageAll: Boolean(canManageAll),
+        promote: Boolean(canPromote),
+        archive: Boolean(canArchive),
+      }}
       initialUsers={(users ?? []) as UserRow[]}
       roles={roles ?? []}
     />

@@ -2,13 +2,13 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { Card } from "@/components/ui/Card";
 import { CheckCircle2 } from "lucide-react";
-import type { RoleName } from "@/lib/types";
 
-const ROLE_LABELS: Record<RoleName, string> = {
-  employee: "Employee",
-  hr: "HR",
-  admin: "Admin",
-};
+function roleLabel(name: string): string {
+  return name
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
 
 export default async function DashboardOverview() {
   const supabase = await createSupabaseServerClient();
@@ -19,25 +19,73 @@ export default async function DashboardOverview() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, roles(name)")
+    .select("full_name, roles(name, assignable_work)")
     .eq("id", user.id)
     .single();
 
-  const role = (profile?.roles as { name: string } | null)?.name as RoleName;
-  const roleLabel = ROLE_LABELS[role] ?? role;
+  const role = profile?.roles as {
+    name: string;
+    assignable_work: boolean;
+  } | null;
   const firstName = profile?.full_name?.split(" ")[0] ?? "there";
 
-  const items: string[] =
-    role === "employee"
-      ? [
-          "See tasks assigned to you under My Tasks.",
-          "Start a task and submit your completed work.",
-        ]
-      : [
-          "Assign and review tasks.",
-          "Track each employee's performance.",
-          role === "admin" ? "Manage users and roles." : "Manage users.",
-        ];
+  const permissionKeys = [
+    "task.view_all",
+    "task.create",
+    "submission.create",
+    "submission.review",
+    "stats.view_all",
+    "user.invite",
+    "user.promote",
+    "user.archive",
+    "user.manage_all",
+    "role.manage",
+  ] as const;
+  const permissionResults = await Promise.all(
+    permissionKeys.map((perm) => supabase.rpc("has_permission", { perm }))
+  );
+  const can = Object.fromEntries(
+    permissionKeys.map((key, index) => [
+      key,
+      Boolean(permissionResults[index].data),
+    ])
+  ) as Record<(typeof permissionKeys)[number], boolean>;
+
+  const items: string[] = [];
+  if (role?.assignable_work) {
+    items.push("View work assigned to you.");
+    if (can["submission.create"]) {
+      items.push("Start and submit your assigned work.");
+    }
+  }
+  if (can["task.view_all"]) {
+    items.push("View team tasks.");
+  }
+  if (can["task.view_all"] && can["task.create"]) {
+    items.push("Assign work to team members.");
+  }
+  if (can["task.view_all"] && can["submission.review"]) {
+    items.push("Review submitted work.");
+  }
+  if (
+    can["stats.view_all"] &&
+    can["task.view_all"] &&
+    can["submission.review"]
+  ) {
+    items.push("Track worker performance.");
+  }
+  if (can["user.invite"]) {
+    items.push("Invite new users.");
+  }
+  if (
+    can["user.manage_all"] ||
+    can["user.promote"] ||
+    can["user.archive"]
+  ) {
+    items.push("Manage the users allowed by your role.");
+  }
+  if (can["role.manage"]) items.push("Manage roles and permission keyrings.");
+  if (items.length === 0) items.push("View the sections available to your role.");
 
   return (
     <div>
@@ -46,7 +94,9 @@ export default async function DashboardOverview() {
       </h1>
       <p className="mt-1 text-sm text-slate-500">
         You&rsquo;re signed in as{" "}
-        <span className="font-medium text-slate-700">{roleLabel}</span>.
+        <span className="font-medium text-slate-700">
+          {role ? roleLabel(role.name) : "Unknown role"}
+        </span>.
       </p>
 
       <Card className="mt-6 p-6">
@@ -64,9 +114,6 @@ export default async function DashboardOverview() {
             </li>
           ))}
         </ul>
-        <p className="mt-4 text-xs text-slate-400">
-          These sections get built in the next features.
-        </p>
       </Card>
     </div>
   );
