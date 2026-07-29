@@ -108,6 +108,9 @@ export default function EmployeeCards({
                   <p className="mt-0.5 truncate text-xs capitalize text-slate-400">
                     Role: {employee.role}
                   </p>
+                  <p className="mt-0.5 truncate text-xs text-slate-400">
+                    Department: {employee.departmentName}
+                  </p>
                   <p className="mt-2 text-[11px] font-medium text-slate-400">
                     {employee.hasHistory &&
                     employee.lifecycleStatus !== "active"

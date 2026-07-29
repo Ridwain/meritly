@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import type {
   AssignableEmployee,
+  Department,
   TaskStatus,
   UserRow,
   UserWorkCounts,
@@ -27,6 +28,8 @@ export default async function UsersPage() {
     { data: canTaskViewAll },
     { data: canTaskUpdate },
     { data: roles },
+    { data: departments },
+    { data: viewerProfile },
   ] = await Promise.all([
     // The RPC scopes non-full managers to worker rows.
     supabase.rpc("admin_list_users"),
@@ -40,6 +43,12 @@ export default async function UsersPage() {
       .from("roles")
       .select("id, name, assignable_work, protected, hr_grantable")
       .order("id"),
+    supabase.from("departments").select("*").order("name"),
+    supabase
+      .from("profiles")
+      .select("department_id")
+      .eq("id", user.id)
+      .single(),
   ]);
   if (error) redirect("/dashboard");
 
@@ -84,6 +93,8 @@ export default async function UsersPage() {
       roles={roles ?? []}
       workCounts={workCounts}
       replacements={(replacements ?? []) as AssignableEmployee[]}
+      departments={(departments ?? []) as Department[]}
+      viewerDepartmentId={viewerProfile?.department_id ?? null}
     />
   );
 }

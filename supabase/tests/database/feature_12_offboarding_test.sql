@@ -97,6 +97,10 @@ select pg_temp.set_feature_12_permissions(
   ]
 );
 
+-- Feature 13 makes Auth provisioning token-only. Test fixtures bypass that
+-- production trigger and create their matching profile rows explicitly.
+alter table auth.users disable trigger on_auth_user_created;
+
 insert into auth.users (
   id, aud, role, email, encrypted_password, email_confirmed_at,
   raw_app_meta_data, raw_user_meta_data, created_at, updated_at
@@ -140,6 +144,23 @@ from (
       'Feature 12 No Access'
     )
 ) as fixture(id, email, full_name);
+
+alter table auth.users enable trigger on_auth_user_created;
+
+insert into public.profiles (id, full_name, role_id, department_id)
+select
+  fixture.id,
+  fixture.full_name,
+  (select id from public.roles where name = 'feature_12_worker'),
+  (select id from public.departments where name = 'General')
+from (
+  values
+    (pg_temp.feature_12_id('actor'), 'Feature 12 Manager'),
+    (pg_temp.feature_12_id('target'), 'Feature 12 Target'),
+    (pg_temp.feature_12_id('replacement'), 'Feature 12 Replacement'),
+    (pg_temp.feature_12_id('queued'), 'Feature 12 Queued'),
+    (pg_temp.feature_12_id('no_access'), 'Feature 12 No Access')
+) as fixture(id, full_name);
 
 update public.profiles
 set

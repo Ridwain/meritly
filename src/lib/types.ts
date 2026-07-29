@@ -25,6 +25,14 @@ export type TaskRow = Tables<"tasks">;
 export type ProfileRow = Tables<"profiles">;
 export type SubmissionRow = Tables<"submissions">;
 
+export type Department = {
+  id: number;
+  name: string;
+  protected: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 // A task as the UI uses it: the row, plus the joined-in display fields and the
 // narrowed status/priority unions.
 export type TaskForUi = Omit<TaskRow, "status" | "priority"> & {
@@ -50,6 +58,8 @@ export type UserRow = {
   email: string;
   deleted_at: string | null;
   accepted: boolean;
+  department_id: number;
+  department_name: string;
 };
 
 // Capabilities decide which controls render. Role names are deliberately absent
@@ -118,7 +128,7 @@ export type MyTask = {
   priority: Priority;
   deadline: string;
   status: TaskStatus;
-  attachment_url: string | null;
+  attachment_path: string | null;
   attachment_name: string | null;
   assigned_by: string;
   assigner_name: string;
@@ -130,7 +140,7 @@ export type LatestSubmission = {
   id: string;
   task_id: string;
   note: string;
-  file_url: string | null;
+  file_path: string | null;
   hr_feedback: string | null;
   submitted_at: string;
 };
@@ -146,7 +156,7 @@ export type HrTask = {
   deadline: string;
   status: TaskStatus;
   created_at: string;
-  attachment_url: string | null;
+  attachment_path: string | null;
   attachment_name: string | null;
   assignee_name: string;
   latest_submission: LatestSubmission | null;
@@ -161,6 +171,8 @@ export type EmployeeSummary = {
   full_name: string;
   email: string | null;
   role: string;
+  departmentId: number;
+  departmentName: string;
   lifecycleStatus: "active" | "promoted" | "archived";
   hasHistory: boolean;
   totalTasks: number;
@@ -176,6 +188,8 @@ export type HistoricalEmployee = {
   accepted: boolean;
   current_assignable: boolean;
   has_history: boolean;
+  department_id: number;
+  department_name: string;
 };
 
 // The two rates shown as KPI tiles on the Performance page. Both are 0 (not

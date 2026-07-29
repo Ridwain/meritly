@@ -55,6 +55,30 @@ export type Database = {
           },
         ]
       }
+      departments: {
+        Row: {
+          created_at: string
+          id: number
+          name: string
+          protected: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          name: string
+          protected?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          name?: string
+          protected?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       task_assignment_history: {
         Row: {
           changed_by: string | null
@@ -224,6 +248,7 @@ export type Database = {
           accepted_at: string | null
           created_at: string
           deleted_at: string | null
+          department_id: number
           full_name: string
           id: string
           role_id: number
@@ -232,6 +257,7 @@ export type Database = {
           accepted_at?: string | null
           created_at?: string
           deleted_at?: string | null
+          department_id: number
           full_name: string
           id: string
           role_id: number
@@ -240,11 +266,19 @@ export type Database = {
           accepted_at?: string | null
           created_at?: string
           deleted_at?: string | null
+          department_id?: number
           full_name?: string
           id?: string
           role_id?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "profiles_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "profiles_role_id_fkey"
             columns: ["role_id"]
@@ -362,6 +396,7 @@ export type Database = {
       submissions: {
         Row: {
           employee_id: string
+          file_path: string | null
           file_url: string | null
           hr_feedback: string | null
           id: string
@@ -372,6 +407,7 @@ export type Database = {
         }
         Insert: {
           employee_id: string
+          file_path?: string | null
           file_url?: string | null
           hr_feedback?: string | null
           id?: string
@@ -382,6 +418,7 @@ export type Database = {
         }
         Update: {
           employee_id?: string
+          file_path?: string | null
           file_url?: string | null
           hr_feedback?: string | null
           id?: string
@@ -412,6 +449,7 @@ export type Database = {
           assigned_by: string
           assigned_to: string
           attachment_name: string | null
+          attachment_path: string | null
           attachment_url: string | null
           created_at: string
           deadline: string
@@ -427,6 +465,7 @@ export type Database = {
           assigned_by: string
           assigned_to: string
           attachment_name?: string | null
+          attachment_path?: string | null
           attachment_url?: string | null
           created_at?: string
           deadline: string
@@ -442,6 +481,7 @@ export type Database = {
           assigned_by?: string
           assigned_to?: string
           attachment_name?: string | null
+          attachment_path?: string | null
           attachment_url?: string | null
           created_at?: string
           deadline?: string
@@ -470,6 +510,68 @@ export type Database = {
           },
         ]
       }
+      user_department_history: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          from_department_id: number
+          id: string
+          reason: string
+          request_id: string
+          target_user_id: string
+          to_department_id: number
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          from_department_id: number
+          id?: string
+          reason: string
+          request_id: string
+          target_user_id: string
+          to_department_id: number
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          from_department_id?: number
+          id?: string
+          reason?: string
+          request_id?: string
+          target_user_id?: string
+          to_department_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_department_history_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_department_history_from_department_id_fkey"
+            columns: ["from_department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_department_history_target_user_id_fkey"
+            columns: ["target_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_department_history_to_department_id_fkey"
+            columns: ["to_department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -480,6 +582,8 @@ export type Database = {
         Returns: {
           accepted: boolean
           deleted_at: string
+          department_id: number
+          department_name: string
           email: string
           full_name: string
           id: string
@@ -505,6 +609,8 @@ export type Database = {
           accepted: boolean
           current_assignable: boolean
           deleted_at: string | null
+          department_id: number
+          department_name: string
           email: string | null
           full_name: string
           has_history: boolean
@@ -515,6 +621,19 @@ export type Database = {
       is_active: { Args: never; Returns: boolean }
       is_assignable_employee: { Args: { target: string }; Returns: boolean }
       my_role: { Args: never; Returns: string }
+      move_user_department: {
+        Args: {
+          p_new_department_id: number
+          p_reason: string
+          p_request_id: string
+          p_target_user_id: string
+        }
+        Returns: {
+          duplicate_request: boolean
+          from_department_id: number
+          to_department_id: number
+        }[]
+      }
       offboard_user: {
         Args: {
           p_action: string
@@ -538,6 +657,19 @@ export type Database = {
           category: string
           task_id: string
         }[]
+      }
+      prepare_user_invite: {
+        Args: {
+          p_created_by: string
+          p_department_id: number
+          p_email: string
+          p_full_name: string
+        }
+        Returns: string
+      }
+      cancel_user_invite_provisioning: {
+        Args: { p_token: string }
+        Returns: undefined
       }
     }
     Enums: {

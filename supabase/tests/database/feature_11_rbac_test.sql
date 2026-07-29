@@ -92,6 +92,11 @@ insert into public.roles (name, assignable_work, protected, hr_grantable) values
   ('audit_non_worker_role', false, false, false),
   ('audit_hr_target_role', false, false, true);
 
+-- Feature 13 makes Auth provisioning token-only. These fixtures are database
+-- test setup, so create Auth and profile rows explicitly instead of pretending
+-- they came through the production invitation route.
+alter table auth.users disable trigger on_auth_user_created;
+
 insert into auth.users (
   id, aud, role, email, encrypted_password, email_confirmed_at,
   raw_app_meta_data, raw_user_meta_data, created_at, updated_at
@@ -115,6 +120,23 @@ from (
     (pg_temp.audit_id('non_worker'), 'rbac-non-worker@example.test', 'RBAC Non Worker'),
     (pg_temp.audit_id('archived_actor'), 'rbac-archived@example.test', 'RBAC Archived')
 ) as fixture(id, email, full_name);
+
+alter table auth.users enable trigger on_auth_user_created;
+
+insert into public.profiles (id, full_name, role_id, department_id)
+select
+  fixture.id,
+  fixture.full_name,
+  (select id from public.roles where name = 'audit_worker_role'),
+  (select id from public.departments where name = 'General')
+from (
+  values
+    (pg_temp.audit_id('actor'), 'RBAC Actor'),
+    (pg_temp.audit_id('worker_one'), 'RBAC Worker One'),
+    (pg_temp.audit_id('worker_two'), 'RBAC Worker Two'),
+    (pg_temp.audit_id('non_worker'), 'RBAC Non Worker'),
+    (pg_temp.audit_id('archived_actor'), 'RBAC Archived')
+) as fixture(id, full_name);
 
 update public.profiles
 set role_id = case id

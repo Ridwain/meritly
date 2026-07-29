@@ -52,6 +52,7 @@ export default async function DashboardLayout({
     "user.promote",
     "user.archive",
     "role.manage",
+    "department.manage",
   ] as const;
   const permissionResults = await Promise.all(
     permissionKeys.map((perm) => supabase.rpc("has_permission", { perm }))
@@ -83,6 +84,9 @@ export default async function DashboardLayout({
   }
   if (can["role.manage"]) {
     nav.push({ href: "/dashboard/roles", label: "Roles" });
+  }
+  if (can["department.manage"]) {
+    nav.push({ href: "/dashboard/departments", label: "Departments" });
   }
 
   return (

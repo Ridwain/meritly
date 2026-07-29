@@ -25,7 +25,7 @@ export default async function MyTasksPage() {
   const { data: tasks } = await supabase
     .from("tasks")
     .select(
-      "id, title, description, priority, deadline, status, attachment_url, attachment_name, assigned_by"
+      "id, title, description, priority, deadline, status, attachment_path, attachment_name, assigned_by"
     )
     .eq("assigned_to", user.id)
     .is("deleted_at", null)

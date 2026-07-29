@@ -60,6 +60,8 @@ export default async function EmployeesPage() {
       // are outside that caller's user-management scope show no email.
       email: emailById.get(subject.id) ?? subject.email,
       role: subject.role,
+      departmentId: subject.department_id,
+      departmentName: subject.department_name,
       lifecycleStatus: subject.deleted_at
         ? "archived"
         : subject.current_assignable

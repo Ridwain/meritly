@@ -1,4 +1,4 @@
-// POST /api/invite-user  { email, fullName }
+// POST /api/invite-user  { email, fullName, departmentId }
 // Creates a new (employee) account by invitation and emails them a link to
 // set their password. This route uses the service-role key, so its FIRST job
 // is to prove the caller is allowed to invite — never trust the request alone.
@@ -10,14 +10,20 @@ import { isValidEmail } from "@/lib/validation";
 type InviteBody = {
   email?: string;
   fullName?: string;
+  departmentId?: number;
 };
 
 export async function POST(request: NextRequest) {
-  const { email, fullName }: InviteBody = await request.json();
+  const { email, fullName, departmentId }: InviteBody = await request.json();
 
-  if (!email || !fullName) {
+  if (
+    !email ||
+    !fullName ||
+    typeof departmentId !== "number" ||
+    !Number.isInteger(departmentId)
+  ) {
     return NextResponse.json(
-      { error: "Email and full name are required." },
+      { error: "Email, full name, and department are required." },
       { status: 400 }
     );
   }
@@ -49,16 +55,60 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // A global manager can invite into any department. Other inviters are
+  // limited to their own department, which mirrors the database scope.
+  const [{ data: canManageAll }, { data: callerProfile }] = await Promise.all([
+    supabase.rpc("has_permission", { perm: "user.manage_all" }),
+    supabase
+      .from("profiles")
+      .select("department_id")
+      .eq("id", user.id)
+      .single(),
+  ]);
+  if (!callerProfile) {
+    return NextResponse.json(
+      { error: "Your department could not be verified." },
+      { status: 403 }
+    );
+  }
+  // Never trust a scoped inviter's submitted department. A crafted request is
+  // silently forced back to the caller's own department.
+  const effectiveDepartmentId = canManageAll
+    ? departmentId
+    : callerProfile.department_id;
+
   // 3) Now (and only now) use the privileged client to create + email the invite.
   // The invite link will send them to /auth/accept to choose a password.
   const admin = createSupabaseAdminClient();
+  const { data: token, error: provisionError } = await admin.rpc(
+    "prepare_user_invite",
+    {
+      p_email: email,
+      p_full_name: fullName,
+      p_department_id: effectiveDepartmentId,
+      p_created_by: user.id,
+    }
+  );
+  if (provisionError || !token) {
+    return NextResponse.json(
+      { error: provisionError?.message ?? "Could not prepare the invitation." },
+      { status: 400 }
+    );
+  }
+
   const redirectTo = `${request.nextUrl.origin}/auth/accept`;
   const { error: inviteError } = await admin.auth.admin.inviteUserByEmail(
     email,
-    { data: { full_name: fullName }, redirectTo }
+    {
+      // The opaque token links Auth creation to trusted server-side state.
+      data: { meritly_provisioning_token: token },
+      redirectTo,
+    }
   );
 
   if (inviteError) {
+    // Do not leave a stale reservation when Auth rejects the invite.
+    await admin.rpc("cancel_user_invite_provisioning", { p_token: token });
     // Most common: the email already has an account.
     return NextResponse.json({ error: inviteError.message }, { status: 400 });
   }

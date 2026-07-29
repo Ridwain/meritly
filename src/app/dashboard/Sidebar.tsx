@@ -10,6 +10,7 @@ import {
   Users,
   UserCog,
   ShieldCheck,
+  Building2,
   LogOut,
 } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
@@ -26,6 +27,7 @@ const ICONS: Record<string, IconComponent> = {
   "/dashboard/employees": Users,
   "/dashboard/users": UserCog,
   "/dashboard/roles": ShieldCheck,
+  "/dashboard/departments": Building2,
 };
 
 export type NavItem = {

@@ -67,7 +67,7 @@ type TaskPayload = {
   assigned_to: string;
   priority: Priority;
   deadline: string;
-  attachment_url?: string;
+  attachment_path?: string;
   attachment_name?: string;
 };
 
@@ -165,8 +165,10 @@ export default function TasksClient({
       deadline: new Date(form.deadline).toISOString(),
     };
 
-    // If a file was chosen, upload it to Storage first, then save its public URL.
+    // If a file was chosen, upload it first, then save only its canonical path.
+    // A signed download URL is created later after RLS authorizes the viewer.
     const file = fileRef.current?.files?.[0];
+    let uploadedPath: string | null = null;
     if (file) {
       const path = `${currentUserId}/${Date.now()}-${file.name}`;
       const { error: upErr } = await supabase.storage
@@ -177,10 +179,8 @@ export default function TasksClient({
         setBusy(false);
         return;
       }
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("task-attachments").getPublicUrl(path);
-      base.attachment_url = publicUrl;
+      uploadedPath = path;
+      base.attachment_path = path;
       base.attachment_name = file.name;
     }
 
@@ -200,6 +200,16 @@ export default function TasksClient({
     }
 
     if (error) {
+      if (uploadedPath) {
+        await fetch("/api/cleanup-upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            bucket: "task-attachments",
+            path: uploadedPath,
+          }),
+        });
+      }
       setNotice({ type: "error", text: error.message });
       setBusy(false);
       return;
@@ -517,9 +527,9 @@ export default function TasksClient({
                             {t.description}
                           </p>
                         )}
-                        {t.attachment_url && (
+                        {t.attachment_path && (
                           <a
-                            href={t.attachment_url}
+                            href={`/api/work-file?kind=task&id=${encodeURIComponent(t.id)}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:underline"
@@ -624,9 +634,9 @@ export default function TasksClient({
                                 <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">
                                   {t.latest_submission.note}
                                 </p>
-                                {t.latest_submission.file_url && (
+                                {t.latest_submission.file_path && (
                                   <a
-                                    href={t.latest_submission.file_url}
+                                    href={`/api/work-file?kind=submission&id=${encodeURIComponent(t.latest_submission.id)}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:underline"

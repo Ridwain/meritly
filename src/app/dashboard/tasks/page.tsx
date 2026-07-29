@@ -49,7 +49,7 @@ export default async function TasksPage() {
     supabase
       .from("tasks")
       .select(
-        "id, title, description, assigned_to, priority, deadline, status, created_at, attachment_url, attachment_name"
+        "id, title, description, assigned_to, priority, deadline, status, created_at, attachment_path, attachment_name"
       )
       .is("deleted_at", null)
       .order("created_at", { ascending: false }),
@@ -77,7 +77,7 @@ export default async function TasksPage() {
   const { data: subs } = capabilities.review
     ? await supabase
         .from("submissions")
-        .select("id, task_id, note, file_url, hr_feedback, submitted_at")
+        .select("id, task_id, note, file_path, hr_feedback, submitted_at")
         .order("submitted_at", { ascending: false })
     : { data: [] };
 

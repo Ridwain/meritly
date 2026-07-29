@@ -83,7 +83,7 @@ export default function MyTasksClient({
     setNotice(null);
 
     // 1) Optional file upload (into the employee's own folder).
-    let file_url: string | null = null;
+    let file_path: string | null = null;
     const file = fileRef.current?.files?.[0];
     if (file) {
       const path = `${userId}/${task.id}-${Date.now()}-${file.name}`;
@@ -95,8 +95,7 @@ export default function MyTasksClient({
         setSaving(false);
         return;
       }
-      file_url = supabase.storage.from("submissions").getPublicUrl(path)
-        .data.publicUrl;
+      file_path = path;
     }
 
     // 2) Insert the submission FIRST — RLS only allows this while the task is
@@ -105,9 +104,18 @@ export default function MyTasksClient({
       task_id: task.id,
       employee_id: userId,
       note: note.trim(),
-      file_url,
+      file_path,
     });
     if (subErr) {
+      if (file_path) {
+        // The upload succeeded but its database row did not, so remove the
+        // now-orphaned object. Cleanup is intentionally best-effort.
+        await fetch("/api/cleanup-upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bucket: "submissions", path: file_path }),
+        });
+      }
       setNotice({ type: "error", text: subErr.message });
       setSaving(false);
       return;
@@ -177,9 +185,9 @@ export default function MyTasksClient({
                       Due {formatDeadline(t.deadline)}
                     </span>
                     <span>Assigned by {t.assigner_name}</span>
-                    {t.attachment_url && (
+                    {t.attachment_path && (
                       <a
-                        href={t.attachment_url}
+                        href={`/api/work-file?kind=task&id=${encodeURIComponent(t.id)}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1 font-medium text-brand-600 hover:underline"
