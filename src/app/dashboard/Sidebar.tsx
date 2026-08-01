@@ -11,6 +11,7 @@ import {
   UserCog,
   ShieldCheck,
   Building2,
+  Plug,
   LogOut,
 } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
@@ -28,6 +29,7 @@ const ICONS: Record<string, IconComponent> = {
   "/dashboard/users": UserCog,
   "/dashboard/roles": ShieldCheck,
   "/dashboard/departments": Building2,
+  "/dashboard/connected-apps": Plug,
 };
 
 export type NavItem = {

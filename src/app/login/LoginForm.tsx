@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/Label";
 
 // The actual sign-in form. Split out from page.tsx so the auth-redirect
 // check there can run on the server, before any client JS loads.
-export default function LoginForm() {
+export default function LoginForm({ returnPath }: { returnPath: string }) {
   const router = useRouter();
   const supabase = createSupabaseBrowserClient();
 
@@ -41,7 +41,9 @@ export default function LoginForm() {
       setLoading(false);
       return;
     }
-    router.push("/dashboard");
+    // OAuth sign-in returns to the pending consent page; ordinary sign-in
+    // continues to use /dashboard.
+    router.push(returnPath);
     router.refresh();
   }
 

@@ -64,7 +64,10 @@ export default async function DashboardLayout({
     ])
   ) as Record<(typeof permissionKeys)[number], boolean>;
 
-  const nav: NavItem[] = [{ href: "/dashboard", label: "Overview" }];
+  const nav: NavItem[] = [
+    { href: "/dashboard", label: "Overview" },
+    { href: "/dashboard/connected-apps", label: "Connected Apps" },
+  ];
   if (role?.assignable_work) {
     nav.push({ href: "/dashboard/my-tasks", label: "My Tasks" });
   }

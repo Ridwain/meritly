@@ -5,15 +5,22 @@
 // you're already signed in (e.g. via the browser Back button).
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { safeReturnPath } from "@/lib/safeReturnPath";
 import LoginForm from "./LoginForm";
 
-export default async function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string | string[] }>;
+}) {
+  const { next } = await searchParams;
+  const returnPath = safeReturnPath(next);
   const supabase = await createSupabaseServerClient();
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (user) redirect("/dashboard");
+  if (user) redirect(returnPath);
 
-  return <LoginForm />;
+  return <LoginForm returnPath={returnPath} />;
 }

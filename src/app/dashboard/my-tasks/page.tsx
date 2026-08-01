@@ -18,9 +18,6 @@ export default async function MyTasksPage() {
     perm: "submission.create",
   });
 
-  // Flag any past-deadline tasks as overdue before we read them (Feature 8).
-  await supabase.rpc("flag_overdue_tasks");
-
   // Only the current user's own, non-archived tasks — soonest deadline first.
   const { data: tasks } = await supabase
     .from("tasks")

@@ -219,8 +219,8 @@ export default function UsersTable({
       p_request_id: lifecycle.requestId,
       p_target_user_id: lifecycle.user.id,
       p_action: lifecycle.action,
-      p_target_role_id: lifecycle.targetRoleId,
-      p_replacement_user_id: replacementId || null,
+      p_target_role_id: lifecycle.targetRoleId ?? undefined,
+      p_replacement_user_id: replacementId || undefined,
       p_reason: cleanReason,
     });
 

@@ -57,10 +57,10 @@ export default function MyTasksClient({
   async function start(id: string) {
     setBusyId(id);
     setNotice(null);
-    const { error } = await supabase
-      .from("tasks")
-      .update({ status: "in_progress" })
-      .eq("id", id);
+    const { error } = await supabase.rpc("start_task_transaction", {
+      p_request_id: crypto.randomUUID(),
+      p_payload: { task_id: id },
+    });
     if (error) setNotice({ type: "error", text: error.message });
     else router.refresh();
     setBusyId(null);
@@ -98,36 +98,27 @@ export default function MyTasksClient({
       file_path = path;
     }
 
-    // 2) Insert the submission FIRST — RLS only allows this while the task is
-    //    still in a submittable state (in_progress / needs_revision / overdue).
-    const { error: subErr } = await supabase.from("submissions").insert({
-      task_id: task.id,
-      employee_id: userId,
-      note: note.trim(),
-      file_path,
+    // The submission row and task status now commit together. If either RLS
+    // check fails, PostgreSQL rolls both changes back.
+    const { error } = await supabase.rpc("submit_work_transaction", {
+      p_request_id: crypto.randomUUID(),
+      p_payload: {
+        task_id: task.id,
+        note: note.trim(),
+        file_path,
+      },
     });
-    if (subErr) {
+    if (error) {
       if (file_path) {
-        // The upload succeeded but its database row did not, so remove the
-        // now-orphaned object. Cleanup is intentionally best-effort.
+        // The upload succeeded but the transaction did not, so remove the
+        // orphaned object. Cleanup is intentionally best-effort.
         await fetch("/api/cleanup-upload", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ bucket: "submissions", path: file_path }),
         });
       }
-      setNotice({ type: "error", text: subErr.message });
-      setSaving(false);
-      return;
-    }
-
-    // 3) Then flip the task to 'submitted'.
-    const { error: taskErr } = await supabase
-      .from("tasks")
-      .update({ status: "submitted" })
-      .eq("id", task.id);
-    if (taskErr) {
-      setNotice({ type: "error", text: taskErr.message });
+      setNotice({ type: "error", text: error.message });
       setSaving(false);
       return;
     }

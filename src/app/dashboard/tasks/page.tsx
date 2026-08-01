@@ -41,9 +41,6 @@ export default async function TasksPage() {
     review: Boolean(canReview),
   };
 
-  // Flag any past-deadline tasks as overdue before we read them (Feature 8).
-  await supabase.rpc("flag_overdue_tasks");
-
   // All active (non-archived) tasks, newest first.
   const [{ data: tasks }, { data: queueRows }] = await Promise.all([
     supabase

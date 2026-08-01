@@ -184,18 +184,19 @@ export default function TasksClient({
       base.attachment_name = file.name;
     }
 
+    // One RPC call owns the whole database change. The request ID lets the
+    // database safely return the first result if the same call is retried.
+    const requestId = crypto.randomUUID();
     let error;
     if (editingId) {
-      ({ error } = await supabase
-        .from("tasks")
-        .update(base)
-        .eq("id", editingId));
+      ({ error } = await supabase.rpc("update_task_transaction", {
+        p_request_id: requestId,
+        p_payload: { task_id: editingId, ...base },
+      }));
     } else {
-      // assigned_by must be the current user; RLS also verifies this.
-      ({ error } = await supabase.from("tasks").insert({
-        ...base,
-        assigned_by: currentUserId,
-        status: "pending",
+      ({ error } = await supabase.rpc("create_task_transaction", {
+        p_request_id: requestId,
+        p_payload: base,
       }));
     }
 
@@ -225,10 +226,10 @@ export default function TasksClient({
   async function archive(id: string) {
     setBusy(true);
     setNotice(null);
-    const { error } = await supabase
-      .from("tasks")
-      .update({ deleted_at: new Date().toISOString() })
-      .eq("id", id);
+    const { error } = await supabase.rpc("archive_task_transaction", {
+      p_request_id: crypto.randomUUID(),
+      p_payload: { task_id: id },
+    });
     if (error) setNotice({ type: "error", text: error.message });
     else router.refresh();
     setBusy(false);
@@ -249,30 +250,26 @@ export default function TasksClient({
     setReviewBusy(true);
     setNotice(null);
 
-    // 1) Save HR feedback on the submission (only feedback fields may change).
     const sub = task.latest_submission;
-    if (sub) {
-      const { error: fbErr } = await supabase
-        .from("submissions")
-        .update({
-          hr_feedback: feedback.trim() || null,
-          reviewed_at: new Date().toISOString(),
-        })
-        .eq("id", sub.id);
-      if (fbErr) {
-        setNotice({ type: "error", text: fbErr.message });
-        setReviewBusy(false);
-        return;
-      }
+    if (!sub) {
+      setNotice({ type: "error", text: "No submission is available to review." });
+      setReviewBusy(false);
+      return;
     }
 
-    // 2) Set the task status (submitted -> completed / needs_revision).
-    const { error: tErr } = await supabase
-      .from("tasks")
-      .update({ status: decision })
-      .eq("id", task.id);
-    if (tErr) {
-      setNotice({ type: "error", text: tErr.message });
+    // Feedback and task status now commit together, so a partial review cannot
+    // leave the submission and task disagreeing with each other.
+    const { error } = await supabase.rpc("review_submission_transaction", {
+      p_request_id: crypto.randomUUID(),
+      p_payload: {
+        task_id: task.id,
+        submission_id: sub.id,
+        decision,
+        feedback: feedback.trim() || null,
+      },
+    });
+    if (error) {
+      setNotice({ type: "error", text: error.message });
       setReviewBusy(false);
       return;
     }
