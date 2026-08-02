@@ -13,6 +13,7 @@ import {
   Building2,
   Plug,
   LogOut,
+  MessageSquareText,
 } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { cn } from "@/lib/cn";
@@ -25,6 +26,7 @@ const ICONS: Record<string, IconComponent> = {
   "/dashboard": LayoutDashboard,
   "/dashboard/tasks": ClipboardList,
   "/dashboard/my-tasks": ListChecks,
+  "/dashboard/task-activity": MessageSquareText,
   "/dashboard/employees": Users,
   "/dashboard/users": UserCog,
   "/dashboard/roles": ShieldCheck,

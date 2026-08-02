@@ -74,6 +74,10 @@ export default async function DashboardLayout({
   if (can["task.view_all"]) {
     nav.push({ href: "/dashboard/tasks", label: "Tasks" });
   }
+  // Task Activity is visible to everyone who can touch tasks — both HR and employees.
+  if (can["task.view_all"] || role?.assignable_work) {
+    nav.push({ href: "/dashboard/task-activity", label: "Task Activity" });
+  }
   if (can["stats.view_all"]) {
     nav.push({ href: "/dashboard/employees", label: "Employees" });
   }
