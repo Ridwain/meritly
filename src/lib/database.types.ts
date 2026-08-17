@@ -77,6 +77,67 @@ export type Database = {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          href: string
+          id: string
+          kind: string
+          message: string
+          read_at: string | null
+          recipient_id: string
+          task_id: string | null
+          title: string
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          href: string
+          id?: string
+          kind: string
+          message: string
+          read_at?: string | null
+          recipient_id: string
+          task_id?: string | null
+          title: string
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          href?: string
+          id?: string
+          kind?: string
+          message?: string
+          read_at?: string | null
+          recipient_id?: string
+          task_id?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       permissions: {
         Row: {
           id: number

@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import Sidebar, { type NavItem } from "./Sidebar";
+import type { NotificationItem } from "@/lib/types";
 
 function roleLabel(name: string): string {
   return name
@@ -54,9 +55,20 @@ export default async function DashboardLayout({
     "role.manage",
     "department.manage",
   ] as const;
-  const permissionResults = await Promise.all(
-    permissionKeys.map((perm) => supabase.rpc("has_permission", { perm }))
-  );
+  const [permissionResults, notificationList, unreadResult] = await Promise.all([
+    Promise.all(
+      permissionKeys.map((perm) => supabase.rpc("has_permission", { perm }))
+    ),
+    supabase
+      .from("notifications")
+      .select("id, kind, title, message, href, read_at, created_at")
+      .order("created_at", { ascending: false })
+      .limit(10),
+    supabase
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .is("read_at", null),
+  ]);
   const can = Object.fromEntries(
     permissionKeys.map((key, index) => [
       key,
@@ -101,6 +113,11 @@ export default async function DashboardLayout({
     <div className="flex min-h-screen bg-slate-50">
       <Sidebar
         nav={nav}
+        notificationUserId={user.id}
+        initialNotifications={
+          (notificationList.data ?? []) as unknown as NotificationItem[]
+        }
+        initialUnreadCount={unreadResult.count ?? 0}
         user={{
           full_name: profile.full_name,
           roleLabel: role ? roleLabel(role.name) : "Unknown role",
