@@ -11,6 +11,8 @@ import {
   Check,
   RotateCcw,
   UserRoundX,
+  Sparkles,
+  Loader2,
 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabaseClient";
 import { Card } from "@/components/ui/Card";
@@ -102,6 +104,12 @@ export default function TasksClient({
   const [notice, setNotice] = useState<Notice | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // AI description generator state
+  // aiGenerating = true while we are waiting for the AI to respond
+  const [aiGenerating, setAiGenerating] = useState(false);
+  // aiError = any error message from the AI (shown under the button)
+  const [aiError, setAiError] = useState<string | null>(null);
+
   // Review state
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState("");
@@ -150,6 +158,51 @@ export default function TasksClient({
     setForm(EMPTY);
     if (fileRef.current) fileRef.current.value = "";
     setNotice(null);
+    setAiError(null);
+  }
+
+  // ── AI DESCRIPTION GENERATOR ─────────────────────────────────────────────
+  // When HR clicks "Generate Description", this function:
+  //   1. Sends the title + priority + deadline to our /api/ai-task-description route
+  //   2. The route asks Google Gemini to write a description
+  //   3. We put that description straight into the form so HR can edit it
+  async function generateDescription() {
+    // Title must exist — the AI needs something to work from
+    if (!form.title.trim()) {
+      setAiError("Please type a task title first, then click Generate.");
+      return;
+    }
+
+    setAiGenerating(true);
+    setAiError(null);
+
+    try {
+      // Call our own API route (which then calls Gemini)
+      const res = await fetch("/api/ai-task-description", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: form.title,
+          priority: form.priority,
+          deadline: form.deadline,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        // Something went wrong — show the error under the button
+        setAiError(data.error ?? "AI failed. Please try again.");
+      } else {
+        // AI succeeded — put the description into the form field
+        // HR can read it, edit it, or delete it before saving
+        set("description", data.description);
+      }
+    } catch {
+      setAiError("Could not reach the AI service. Check your internet connection.");
+    }
+
+    setAiGenerating(false);
   }
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
@@ -306,14 +359,44 @@ export default function TasksClient({
               />
             </div>
             <div>
-              <Label>Description</Label>
+              {/* The label row: "Description" on the left, "✨ Generate" button on the right */}
+              <div className="mb-1 flex items-center justify-between">
+                <Label>Description</Label>
+                <button
+                  type="button"
+                  onClick={generateDescription}
+                  disabled={aiGenerating || !form.title.trim()}
+                  className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-violet-700 hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40 transition-colors"
+                  title={
+                    !form.title.trim()
+                      ? "Type a title first"
+                      : "Ask AI to write a description"
+                  }
+                >
+                  {/* Show a spinning icon while AI is thinking, otherwise the sparkle icon */}
+                  {aiGenerating ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3.5 w-3.5" />
+                  )}
+                  {aiGenerating ? "Generating…" : "Generate with AI"}
+                </button>
+              </div>
               <textarea
                 rows={2}
                 value={form.description}
                 onChange={(e) => set("description", e.target.value)}
-                placeholder="What needs to be done"
+                placeholder={
+                  aiGenerating
+                    ? "AI is writing a description…"
+                    : "Type your own, or click Generate with AI above"
+                }
                 className={FIELD}
               />
+              {/* Show any AI error message in red below the textarea */}
+              {aiError && (
+                <p className="mt-1 text-xs text-rose-600">{aiError}</p>
+              )}
             </div>
             <div className="grid gap-4 sm:grid-cols-3">
               <div>
