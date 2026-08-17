@@ -1,161 +1,226 @@
 // POST /api/ai-task-description
-//
-// HR types a short task title and clicks "Generate Description".
-// This route sends that title to Google Gemini (our AI) and gets back
-// a full, clear description of what the employee needs to do.
-//
-// Think of it like this:
-//   HR types:  "monthly sales report"
-//   AI writes: "Prepare a detailed monthly sales report covering revenue,
-//               top-performing products, and regional breakdowns. Include
-//               a short summary of key insights and export the final file
-//               as a PDF before the deadline."
-//
-// The description is just a SUGGESTION — HR can edit it before saving.
+// Generates a short, simple, human-readable task description with Gemini.
 
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 
 export async function POST(req: Request) {
-  // ── Step 1: Make sure the person is logged in ──────────────────────────────
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    // Not logged in → refuse the request
-    return NextResponse.json({ error: "Not logged in." }, { status: 401 });
-  }
-
-  // ── Step 2: Make sure the person is allowed to create tasks (HR only) ──────
-  const { data: canCreate } = await supabase.rpc("has_permission", {
-    perm: "task.create",
-  });
-
-  if (!canCreate) {
-    return NextResponse.json(
-      { error: "You do not have permission to create tasks." },
-      { status: 403 }
-    );
-  }
-
-  // ── Step 3: Check the AI key is configured on the server ──────────────────
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: "The AI service is not configured. Ask your admin to add GEMINI_API_KEY." },
-      { status: 500 }
-    );
-  }
-
-  // ── Step 4: Read the title, priority, and deadline sent by the browser ──────
-  const body = await req.json();
-  const { title, priority, deadline } = body as {
-    title: string;
-    priority: string;
-    deadline: string; // may be empty string if HR hasn't filled it yet
-  };
-
-  // Title is required — we can't generate a description for nothing
-  if (!title || !title.trim()) {
-    return NextResponse.json(
-      { error: "Please fill in the task title first." },
-      { status: 400 }
-    );
-  }
-
-  // Format the deadline nicely for the AI prompt, e.g. "Aug 20, 2026, 5:00 PM"
-  // If no deadline is set yet, just say "not specified"
-  let deadlineText = "not specified";
-  if (deadline) {
-    deadlineText = new Date(deadline).toLocaleString("en-US", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  }
-
-  // ── Step 5: Build the instructions we send to Gemini ──────────────────────
-  // The "prompt" is like a text message to the AI telling it exactly what to do.
-  const prompt = `You are an HR manager writing a task description for an employee.
-
-TASK INFORMATION
-Title: ${title.trim()}
-Priority: ${priority}
-Deadline: ${deadlineText}
-
-YOUR JOB
-Write a clear, friendly task description (2 to 4 sentences) that tells the employee:
-1. What they need to do
-2. What the final result should look like
-3. Any quality bar or format to follow (e.g. PDF, spreadsheet, summary)
-
-Rules:
-- Keep it simple and professional
-- Do not use bullet points — write it as plain sentences
-- Do not repeat the title word for word
-- Do not include a deadline sentence (the deadline is shown separately)
-
-Respond with ONLY valid JSON in this exact shape — no markdown, no extra text:
-{"description":"<your description here>"}`;
-
-  // ── Step 6: Send the prompt to Google Gemini and wait for the answer ───────
   try {
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.5,  // 0 = very predictable, 1 = very creative
-            maxOutputTokens: 256, // short descriptions only
-          },
-        }),
-      }
-    );
+    // 1. Check login
+    const supabase = await createSupabaseServerClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-    // If Gemini itself returned an error, pass it along
-    if (!geminiRes.ok) {
-      const errText = await geminiRes.text();
+    if (!user) {
+      return NextResponse.json({ error: "Not logged in." }, { status: 401 });
+    }
+
+    // 2. Check permission
+    const { data: canCreate } = await supabase.rpc("has_permission", {
+      perm: "task.create",
+    });
+
+    if (!canCreate) {
       return NextResponse.json(
-        { error: `AI service error: ${errText}` },
-        { status: 502 }
+        { error: "Permission denied." },
+        { status: 403 }
       );
     }
 
-    // ── Step 7: Pull the text out of Gemini's response ─────────────────────
-    const geminiData = await geminiRes.json();
+    // 3. Check Gemini API key
+    const apiKey = process.env.GEMINI_API_KEY;
 
-    // Gemini wraps its answer in a nested structure — we dig in to get the text
-    const rawText: string =
-      geminiData?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-
-    // Sometimes Gemini wraps the JSON in ```json ... ``` — strip that off
-    const cleaned = rawText.replace(/```json|```/g, "").trim();
-
-    // Turn the text into a real JavaScript object
-    const parsed = JSON.parse(cleaned) as { description: string };
-
-    // Make sure the AI actually gave us a description string
-    if (typeof parsed.description !== "string" || !parsed.description.trim()) {
-      throw new Error("AI returned an unexpected format.");
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: "GEMINI_API_KEY is not set." },
+        { status: 500 }
+      );
     }
 
-    // ── Step 8: Send the description back to the browser ───────────────────
-    return NextResponse.json({ description: parsed.description.trim() });
+    // 4. Read request body
+    const body = (await req.json()) as {
+      title?: string;
+      priority?: string;
+    };
 
+    const title = body.title?.trim();
+
+    if (!title) {
+      return NextResponse.json(
+        { error: "Please enter a task title first." },
+        { status: 400 }
+      );
+    }
+
+    const url =
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent";
+
+    const headers = {
+      "Content-Type": "application/json",
+      "x-goog-api-key": apiKey,
+    };
+
+    // Clean Gemini's answer without accidentally deleting the real sentence.
+    function cleanDescription(text: string) {
+      let result = text
+        .replace(/\*\*/g, "")
+        .replace(/\*/g, "")
+        .replace(/`/g, "")
+        .replace(/#+\s*/g, "")
+        .replace(/^[-•]\s*/gm, "")
+        .replace(/\r?\n+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      // Remove unwanted labels Gemini may put before the real answer.
+      // Examples: "Goal. Prepare...", "Description: Prepare..."
+      result = result.replace(
+        /^(?:goal|description|answer|task|objective|result|output)\s*[:.\-–—]*\s*/i,
+        ""
+      );
+
+      // Remove wrapping quotes.
+      result = result.replace(/^["']+|["']+$/g, "").trim();
+
+      // If Gemini still added another label, remove it once more.
+      result = result.replace(
+        /^(?:goal|description|answer|task|objective|result|output)\s*[:.\-–—]*\s*/i,
+        ""
+      );
+
+      // Keep it short, but DON'T cut at the first period.
+      const words = result.split(/\s+/).filter(Boolean);
+      if (words.length > 22) {
+        result = words.slice(0, 22).join(" ");
+      }
+
+      // Remove trailing punctuation before adding one clean period.
+      result = result.replace(/[\s,;:\-–—]+$/, "").trim();
+
+      if (result && !/[.!?]$/.test(result)) {
+        result += ".";
+      }
+
+      return result;
+    }
+
+    function isBadDescription(text: string) {
+      const normalized = text
+        .toLowerCase()
+        .replace(/[^a-z0-9 ]/g, "")
+        .trim();
+
+      const badWords = [
+        "goal",
+        "description",
+        "answer",
+        "task",
+        "objective",
+        "result",
+        "output",
+      ];
+
+      const wordCount = normalized.split(/\s+/).filter(Boolean).length;
+
+      return (
+        !normalized ||
+        wordCount < 4 ||
+        badWords.includes(normalized)
+      );
+    }
+
+    async function generateDescription(extraInstruction = "") {
+      const prompt = `
+You create very short task descriptions for employees.
+
+Task title: "${title}"
+
+Write exactly ONE short and natural sentence that explains what the employee should do.
+
+Rules:
+- Use very simple everyday English.
+- Keep it around 8 to 18 words.
+- Make the meaning clear to a normal person.
+- Do not write "Goal", "Description", "Task", "Objective", "Answer", or any heading.
+- Do not use bullet points or markdown.
+- Do not repeat the title word-for-word if a clearer sentence is possible.
+- Do not invent deadlines, names, numbers, tools, or requirements.
+- Return ONLY the description sentence.
+${extraInstruction}
+
+Examples:
+Title: prepare pdf about AI
+Prepare a short PDF that clearly explains the basic ideas of artificial intelligence.
+
+Title: fix login button
+Fix the login button so users can sign in without problems.
+
+Title: check employee attendance
+Review the employee attendance records and make sure the information is correct.
+`.trim();
+
+      const payload = {
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: prompt }],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.15,
+          maxOutputTokens: 80,
+        },
+      };
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error("Gemini API error:", errorText);
+        throw new Error("Could not generate a description.");
+      }
+
+      const data = await res.json();
+
+      const rawText: string =
+        data?.candidates?.[0]?.content?.parts
+          ?.map((part: { text?: string }) => part.text ?? "")
+          .join(" ") ?? "";
+
+      return cleanDescription(rawText);
+    }
+
+    // 5. First AI attempt
+    let description = await generateDescription();
+
+    // 6. Retry once if Gemini returned something useless like "Goal."
+    if (isBadDescription(description)) {
+      description = await generateDescription(
+        "IMPORTANT: Your previous type of response was too short or only a label. Write the actual action sentence now."
+      );
+    }
+
+    // 7. Final safety check
+    if (isBadDescription(description)) {
+      return NextResponse.json(
+        { error: "AI did not return a useful description. Please try again." },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ description });
   } catch (err) {
+    console.error("AI task description error:", err);
+
     return NextResponse.json(
       {
         error:
-          err instanceof Error
-            ? err.message
-            : "Something went wrong with the AI. Please try again.",
+          err instanceof Error ? err.message : "Something went wrong.",
       },
       { status: 500 }
     );

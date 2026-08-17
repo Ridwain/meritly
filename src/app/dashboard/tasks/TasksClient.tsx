@@ -383,15 +383,27 @@ export default function TasksClient({
                 </button>
               </div>
               <textarea
-                rows={2}
+                rows={4}
                 value={form.description}
-                onChange={(e) => set("description", e.target.value)}
+                onChange={(e) => {
+                  set("description", e.target.value);
+                  // Auto-grow: reset height first so it can shrink too
+                  e.target.style.height = "auto";
+                  e.target.style.height = e.target.scrollHeight + "px";
+                }}
+                ref={(el) => {
+                  // When AI fills the text, also resize the box immediately
+                  if (el) {
+                    el.style.height = "auto";
+                    el.style.height = el.scrollHeight + "px";
+                  }
+                }}
                 placeholder={
                   aiGenerating
                     ? "AI is writing a description…"
                     : "Type your own, or click Generate with AI above"
                 }
-                className={FIELD}
+                className={FIELD + " resize-none overflow-hidden"}
               />
               {/* Show any AI error message in red below the textarea */}
               {aiError && (
