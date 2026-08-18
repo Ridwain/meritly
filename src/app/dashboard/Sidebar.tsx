@@ -14,6 +14,7 @@ import {
   Plug,
   LogOut,
   MessageSquareText,
+  Download,
 } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { cn } from "@/lib/cn";
@@ -28,6 +29,7 @@ const ICONS: Record<string, IconComponent> = {
   "/dashboard/my-tasks": ListChecks,
   "/dashboard/task-activity": MessageSquareText,
   "/dashboard/employees": Users,
+  "/dashboard/export": Download,
   "/dashboard/users": UserCog,
   "/dashboard/roles": ShieldCheck,
   "/dashboard/departments": Building2,

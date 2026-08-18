@@ -80,6 +80,7 @@ export default async function DashboardLayout({
   }
   if (can["stats.view_all"]) {
     nav.push({ href: "/dashboard/employees", label: "Employees" });
+    nav.push({ href: "/dashboard/export", label: "Export Report" });
   }
   if (
     can["user.invite"] ||
