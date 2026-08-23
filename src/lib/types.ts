@@ -25,25 +25,6 @@ export type TaskRow = Tables<"tasks">;
 export type ProfileRow = Tables<"profiles">;
 export type SubmissionRow = Tables<"submissions">;
 
-export type NotificationKind =
-  | "task_assigned"
-  | "task_reassigned"
-  | "work_submitted"
-  | "work_approved"
-  | "revision_requested";
-
-// Only the fields needed by the dropdown leave the server. Internal actor and
-// task UUIDs stay in the database because the UI does not need them.
-export type NotificationItem = {
-  id: string;
-  kind: NotificationKind;
-  title: string;
-  message: string;
-  href: "/dashboard/my-tasks" | "/dashboard/tasks";
-  read_at: string | null;
-  created_at: string;
-};
-
 export type Department = {
   id: number;
   name: string;

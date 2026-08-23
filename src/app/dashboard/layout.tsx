@@ -4,7 +4,6 @@ import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import Sidebar, { type NavItem } from "./Sidebar";
-import type { NotificationItem } from "@/lib/types";
 
 function roleLabel(name: string): string {
   return name
@@ -55,20 +54,9 @@ export default async function DashboardLayout({
     "role.manage",
     "department.manage",
   ] as const;
-  const [permissionResults, notificationList, unreadResult] = await Promise.all([
-    Promise.all(
-      permissionKeys.map((perm) => supabase.rpc("has_permission", { perm }))
-    ),
-    supabase
-      .from("notifications")
-      .select("id, kind, title, message, href, read_at, created_at")
-      .order("created_at", { ascending: false })
-      .limit(10),
-    supabase
-      .from("notifications")
-      .select("id", { count: "exact", head: true })
-      .is("read_at", null),
-  ]);
+  const permissionResults = await Promise.all(
+    permissionKeys.map((perm) => supabase.rpc("has_permission", { perm }))
+  );
   const can = Object.fromEntries(
     permissionKeys.map((key, index) => [
       key,
@@ -78,6 +66,7 @@ export default async function DashboardLayout({
 
   const nav: NavItem[] = [
     { href: "/dashboard", label: "Overview" },
+    { href: "/dashboard/documents", label: "Documents" },
     { href: "/dashboard/connected-apps", label: "Connected Apps" },
   ];
   if (role?.assignable_work) {
@@ -86,13 +75,8 @@ export default async function DashboardLayout({
   if (can["task.view_all"]) {
     nav.push({ href: "/dashboard/tasks", label: "Tasks" });
   }
-  // Task Activity is visible to everyone who can touch tasks — both HR and employees.
-  if (can["task.view_all"] || role?.assignable_work) {
-    nav.push({ href: "/dashboard/task-activity", label: "Task Activity" });
-  }
   if (can["stats.view_all"]) {
     nav.push({ href: "/dashboard/employees", label: "Employees" });
-    nav.push({ href: "/dashboard/export", label: "Export Report" });
   }
   if (
     can["user.invite"] ||
@@ -113,11 +97,6 @@ export default async function DashboardLayout({
     <div className="flex min-h-screen bg-slate-50">
       <Sidebar
         nav={nav}
-        notificationUserId={user.id}
-        initialNotifications={
-          (notificationList.data ?? []) as unknown as NotificationItem[]
-        }
-        initialUnreadCount={unreadResult.count ?? 0}
         user={{
           full_name: profile.full_name,
           roleLabel: role ? roleLabel(role.name) : "Unknown role",

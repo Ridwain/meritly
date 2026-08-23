@@ -12,30 +12,24 @@ import {
   ShieldCheck,
   Building2,
   Plug,
+  FileText,
   LogOut,
-  MessageSquareText,
-  Download,
 } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { cn } from "@/lib/cn";
-import type { NotificationItem } from "@/lib/types";
-import NotificationBell from "./NotificationBell";
 
-// Icon per nav route. usePathname() (client-only) tells us which link is active.
-// Record<string, IconComponent> lets us look up by any href and fall back.
 type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
 const ICONS: Record<string, IconComponent> = {
   "/dashboard": LayoutDashboard,
   "/dashboard/tasks": ClipboardList,
   "/dashboard/my-tasks": ListChecks,
-  "/dashboard/task-activity": MessageSquareText,
   "/dashboard/employees": Users,
-  "/dashboard/export": Download,
   "/dashboard/users": UserCog,
   "/dashboard/roles": ShieldCheck,
   "/dashboard/departments": Building2,
   "/dashboard/connected-apps": Plug,
+  "/dashboard/documents": FileText,
 };
 
 export type NavItem = {
@@ -45,35 +39,21 @@ export type NavItem = {
 
 export type SidebarProps = {
   nav: NavItem[];
-  notificationUserId: string;
-  initialNotifications: NotificationItem[];
-  initialUnreadCount: number;
   user: {
     full_name: string;
     roleLabel: string;
   };
 };
 
-export default function Sidebar({
-  nav,
-  notificationUserId,
-  initialNotifications,
-  initialUnreadCount,
-  user,
-}: SidebarProps) {
+export default function Sidebar({ nav, user }: SidebarProps) {
   const pathname = usePathname();
 
   return (
     <aside className="sticky top-0 flex h-screen w-60 flex-col border-r border-slate-200 bg-white">
-      <div className="flex items-center justify-between px-5 py-3.5">
+      <div className="px-5 py-5">
         <span className="text-sm font-semibold uppercase tracking-[0.2em] text-brand-600">
           Meritly
         </span>
-        <NotificationBell
-          userId={notificationUserId}
-          initialNotifications={initialNotifications}
-          initialUnreadCount={initialUnreadCount}
-        />
       </div>
 
       <nav className="flex-1 space-y-0.5 px-3">
