@@ -1,5 +1,3 @@
-// Performance dashboard (Server Component): one employee's stats + trend.
-// Employees see only their own; HR/admin pick who via ?emp=<id>.
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
@@ -7,6 +5,7 @@ import { computeRates } from "@/lib/stats";
 import { Card } from "@/components/ui/Card";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
+import { Printer } from "lucide-react";
 import type { ActivityRow, TaskStatus } from "@/lib/types";
 import PerformanceChart from "./PerformanceChart";
 
@@ -54,19 +53,33 @@ export default async function PerformancePage({
     );
   }
 
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("full_name, deleted_at, roles(name, assignable_work)")
-    .eq("id", targetId)
-    .single();
+  // Fetch HR's own department AND employee's profile together
+  const [{ data: profile, error: profileError }, { data: hrProfile }] =
+    await Promise.all([
+      supabase
+        .from("profiles")
+        .select("full_name, deleted_at, department_id, roles(name, assignable_work)")
+        .eq("id", targetId)
+        .single(),
+      supabase
+        .from("profiles")
+        .select("department_id")
+        .eq("id", user.id)
+        .single(),
+    ]);
 
-  if (profileError || !profile) {
-    return (
+  if (profileError || !profile) {    return (
       <Card className="p-8 text-center text-sm text-slate-500">
         Employee not found.
       </Card>
     );
   }
+
+  // HR can only print employees in their OWN department.
+  // We explicitly type the fetched profile so TypeScript knows department_id exists.
+  const empDeptId = (profile as unknown as { department_id: number }).department_id;
+  const hrDeptId = hrProfile?.department_id;
+  const canPrint = Boolean(canViewAll) && !!hrDeptId && empDeptId === hrDeptId;
 
   const targetRole = profile.roles as {
     name: string;
@@ -119,12 +132,24 @@ export default async function PerformancePage({
           </div>
         </div>
         {canViewAll && (
-          <Link
-            href="/dashboard/employees"
-            className="text-sm font-medium text-brand-600 hover:underline"
-          >
-            Back to Employees
-          </Link>
+          <div className="flex items-center gap-3">
+            {/* Print button — only shown if employee is in HR's department */}
+            {canPrint && (
+              <Link
+                href={`/dashboard/performance/print?emp=${targetId}`}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-100 transition-colors"
+              >
+                <Printer className="h-3.5 w-3.5" />
+                Print Report
+              </Link>
+            )}
+            <Link
+              href="/dashboard/employees"
+              className="text-sm font-medium text-brand-600 hover:underline"
+            >
+              Back to Employees
+            </Link>
+          </div>
         )}
       </div>
 
